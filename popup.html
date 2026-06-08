@@ -1,0 +1,430 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="utf-8">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <style>
+    * { box-sizing: border-box; }
+    html, body { margin: 0; padding: 0; background: #111216; }
+    body { width: 400px; }
+
+    .mp-popup {
+      --s0: #121317; --s1: #191B20; --s2: #22252B;
+      --bd: rgba(255,255,255,0.08); --bd2: rgba(255,255,255,0.15);
+      --tx: #ECEDEE; --dim: #9BA1A8; --faint: #6B7077;
+      --add: #5FE0A0; --del: #FF8A92;
+      --accent-soft: color-mix(in srgb, var(--accent) 16%, transparent);
+      background: linear-gradient(180deg, #15161A, #111216 120px);
+      color: var(--tx);
+      font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+    }
+    .mp-popup svg { display: block; }
+
+    /* ——— Header ——— */
+    .mp-pop-head {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 13px 15px; border-bottom: 1px solid var(--bd);
+      background: rgba(255,255,255,0.015);
+    }
+    .mp-brand { display: flex; align-items: center; gap: 10px; }
+    .mp-logo {
+      width: 28px; height: 28px; border-radius: 9px;
+      display: flex; align-items: center; justify-content: center; font-size: 16px;
+      background: linear-gradient(150deg, var(--accent), color-mix(in srgb, var(--accent) 60%, #C0392B));
+      color: #15110E;
+      box-shadow: 0 4px 14px color-mix(in srgb, var(--accent) 30%, transparent);
+    }
+    .mp-brand-text { display: flex; flex-direction: column; line-height: 1.05; }
+    .mp-word {
+      font-family: "Space Grotesk", sans-serif;
+      font-size: 15px; font-weight: 600; letter-spacing: -0.01em;
+    }
+    .mp-sub {
+      font-size: 9.5px; text-transform: uppercase; letter-spacing: 0.14em;
+      color: var(--faint); margin-top: 3px; white-space: nowrap;
+    }
+    .mp-ver {
+      font-size: 10px; color: var(--dim); background: var(--s1);
+      border: 1px solid var(--bd); border-radius: 6px; padding: 2px 6px;
+    }
+    .mp-icon-btn {
+      width: 30px; height: 30px; border-radius: 8px;
+      border: 1px solid transparent; background: transparent; color: var(--dim);
+      cursor: pointer; display: flex; align-items: center; justify-content: center;
+      transition: all .15s;
+    }
+    .mp-icon-btn:hover { background: var(--s1); color: var(--tx); }
+    .mp-icon-btn.on { background: var(--accent-soft); color: var(--accent); }
+
+    /* ——— Body ——— */
+    .mp-pop-body {
+      padding: 14px 15px 16px;
+      max-height: 540px; overflow-y: auto;
+    }
+    .mp-pop-body::-webkit-scrollbar { width: 9px; }
+    .mp-pop-body::-webkit-scrollbar-thumb {
+      background: rgba(255,255,255,0.10); border-radius: 9px;
+      border: 3px solid transparent; background-clip: padding-box;
+    }
+    .mp-view { display: flex; flex-direction: column; }
+
+    /* ——— Labels + layout ——— */
+    .mp-label {
+      font-size: 10px; font-weight: 600; text-transform: uppercase;
+      letter-spacing: 0.09em; color: var(--faint);
+    }
+    .mp-label.tiny { display: inline-flex; align-items: center; gap: 5px; }
+    .mp-label.tiny svg { width: 12px; height: 12px; }
+    .mp-row-between {
+      display: flex; align-items: center; justify-content: space-between; margin-bottom: 7px;
+    }
+    .mp-pill {
+      display: inline-flex; align-items: center; gap: 5px; font-size: 10.5px;
+      color: var(--accent); white-space: nowrap;
+      background: var(--accent-soft); border-radius: 999px; padding: 3px 9px;
+    }
+    .mp-pill svg { width: 12px; height: 12px; }
+
+    /* ——— Source textarea ——— */
+    .mp-source {
+      width: 100%; min-height: 78px; background: var(--s1); border: 1px solid var(--bd);
+      border-radius: 12px; padding: 11px 12px; color: var(--tx);
+      font: 13px/1.5 ui-sans-serif, system-ui, sans-serif; resize: none; outline: none;
+      transition: border-color .15s;
+    }
+    .mp-source:focus { border-color: color-mix(in srgb, var(--accent) 55%, transparent); }
+
+    /* ——— Controls grid ——— */
+    .mp-controls { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 12px; }
+    .mp-ctrl { display: flex; flex-direction: column; gap: 6px; }
+
+    .mp-select-wrap { position: relative; }
+    .mp-select {
+      width: 100%; appearance: none; -webkit-appearance: none;
+      background: var(--s1); border: 1px solid var(--bd); border-radius: 10px;
+      padding: 9px 30px 9px 11px; color: var(--tx); font-size: 12.5px;
+      cursor: pointer; outline: none;
+    }
+    .mp-select:focus { border-color: color-mix(in srgb, var(--accent) 55%, transparent); }
+    .mp-select-chev {
+      position: absolute; right: 9px; top: 50%; transform: translateY(-50%);
+      color: var(--dim); pointer-events: none;
+    }
+
+    .mp-seg {
+      display: flex; gap: 3px; background: var(--s1); border: 1px solid var(--bd);
+      border-radius: 10px; padding: 3px;
+    }
+    .mp-seg.small .mp-seg-btn { padding: 6px 0; font-size: 11.5px; }
+    .mp-seg-btn {
+      flex: 1; border: none; background: transparent; color: var(--dim);
+      border-radius: 7px; padding: 8px 0; font-size: 12.5px; cursor: pointer;
+      transition: all .15s; font-family: inherit;
+    }
+    .mp-seg-btn:hover { color: var(--tx); }
+    .mp-seg-btn.on { background: var(--accent-soft); color: var(--accent); font-weight: 600; }
+
+    /* ——— Buttons ——— */
+    .mp-btn {
+      display: flex; align-items: center; justify-content: center; gap: 8px;
+      border: none; cursor: pointer;
+      font: 600 13px/1 ui-sans-serif, system-ui, sans-serif;
+      border-radius: 11px; padding: 11px 14px; transition: all .15s;
+    }
+    .mp-btn svg { width: 15px; height: 15px; }
+    .mp-btn.full { width: 100%; }
+    .mp-btn.accent {
+      background: linear-gradient(180deg, color-mix(in srgb, var(--accent) 96%, #fff), var(--accent));
+      color: #16110D;
+    }
+    .mp-btn.accent:hover { filter: brightness(1.06); }
+    .mp-btn.ghost { background: var(--s1); color: var(--tx); border: 1px solid var(--bd); }
+    .mp-btn.ghost:hover { background: var(--s2); }
+    .mp-btn.flash { background: rgba(62,207,142,0.16); color: var(--add); border-color: transparent; }
+    .mp-btn:disabled { cursor: default; opacity: 0.65; }
+
+    /* Revise button states */
+    .mp-btn.revise { position: relative; overflow: hidden; margin-top: 14px; }
+    .mp-btn.revise.busy { background: var(--s2); color: var(--dim); }
+
+    /* Show spark+label in normal state; show spin+step in busy */
+    .mp-btn.revise .btn-spin { display: none; }
+    .mp-btn.revise .btn-step { display: none; }
+    .mp-btn.revise.busy .btn-spark { display: none; }
+    .mp-btn.revise.busy .btn-label { display: none; }
+    .mp-btn.revise.busy .btn-spin { display: block; }
+    .mp-btn.revise.busy .btn-step { display: block; }
+
+    .mp-progress {
+      position: absolute; left: 0; bottom: 0; height: 2px;
+      background: var(--accent); transition: width .35s ease;
+    }
+    .mp-spin {
+      width: 14px; height: 14px; border-radius: 50%; flex-shrink: 0;
+      border: 2px solid rgba(255,255,255,0.18);
+      border-top-color: var(--accent);
+      animation: spin .7s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ——— Status ——— */
+    .mp-status { font-size: 12px; min-height: 0; margin-top: 6px; line-height: 1.4; }
+    .mp-status:empty { display: none; }
+    .mp-status.error { color: var(--del); }
+    .mp-status.info { color: var(--dim); }
+
+    /* ——— Done bar ——— */
+    .mp-done-bar {
+      display: flex; align-items: center; gap: 8px;
+      font-size: 11.5px; color: var(--dim); margin: 14px 0 9px; white-space: nowrap;
+      overflow: hidden;
+    }
+    .mp-done-dot {
+      width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0;
+      background: var(--add); box-shadow: 0 0 0 3px rgba(95,224,160,0.16);
+    }
+    #doneMsg { overflow: hidden; text-overflow: ellipsis; }
+    .mp-ghost-mini {
+      margin-left: auto; flex-shrink: 0; background: none; border: none;
+      color: var(--accent); font-size: 11.5px; cursor: pointer; font-family: inherit;
+      padding: 0;
+    }
+
+    /* ——— Tabs ——— */
+    .mp-tabs {
+      display: flex; gap: 3px; background: var(--s1); border: 1px solid var(--bd);
+      border-radius: 10px; padding: 3px;
+    }
+    .mp-tab {
+      flex: 1; border: none; background: transparent; color: var(--dim);
+      border-radius: 7px; padding: 7px 0; font-size: 12px; cursor: pointer;
+      display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+      transition: all .15s; font-family: inherit;
+    }
+    .mp-tab:hover { color: var(--tx); }
+    .mp-tab.on { background: var(--s2); color: var(--tx); font-weight: 600; }
+    .mp-tabpane { margin-top: 10px; }
+
+    /* ——— Output (styled as mono block) ——— */
+    textarea#output {
+      width: 100%; display: block; margin: 0;
+      font: 11.5px/1.55 "JetBrains Mono", monospace;
+      background: var(--s1); border: 1px solid var(--bd); border-radius: 12px;
+      padding: 12px; color: var(--tx); resize: none; outline: none;
+      min-height: 140px; max-height: 218px; overflow-y: auto;
+      white-space: pre-wrap; word-break: break-word;
+    }
+    textarea#output::placeholder { color: var(--faint); font-style: normal; }
+    textarea#output::-webkit-scrollbar { width: 8px; }
+    textarea#output::-webkit-scrollbar-thumb {
+      background: rgba(255,255,255,0.10); border-radius: 8px;
+    }
+
+    /* ——— Actions ——— */
+    .mp-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 12px; }
+
+    /* ——— Recent / History ——— */
+    .mp-recent { margin-top: 14px; border-top: 1px solid var(--bd); padding-top: 12px; }
+    .mp-recent-head {
+      display: flex; align-items: center; gap: 8px; width: 100%;
+      background: none; border: none; color: var(--dim);
+      font-size: 12px; cursor: pointer; font-family: inherit; padding: 0;
+    }
+    .mp-recent-head svg { width: 14px; height: 14px; flex-shrink: 0; }
+    .mp-recent-n {
+      background: var(--s1); border: 1px solid var(--bd); border-radius: 5px;
+      font-size: 10px; padding: 1px 6px; color: var(--dim);
+    }
+    .mp-recent-chev { margin-left: auto; transition: transform .2s; display: flex; }
+    .mp-recent.open .mp-recent-chev { transform: rotate(180deg); }
+    .mp-recent-list {
+      list-style: none; margin: 9px 0 0; padding: 0;
+      display: flex; flex-direction: column; gap: 3px;
+    }
+    .mp-recent-item {
+      display: flex; align-items: center; justify-content: space-between;
+      gap: 10px; padding: 8px 10px; border-radius: 9px;
+      background: var(--s1); cursor: pointer; transition: background .15s;
+    }
+    .mp-recent-item:hover { background: var(--s2); }
+    .mp-recent-txt {
+      font-size: 12px; color: var(--tx);
+      overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    }
+    .mp-recent-when { font-size: 10.5px; color: var(--faint); white-space: nowrap; flex-shrink: 0; }
+  </style>
+</head>
+<body>
+  <div class="mp-popup" style="--accent:#FF7A4D">
+
+    <!-- ——— Header ——— -->
+    <div class="mp-pop-head">
+      <div class="mp-brand">
+        <span class="mp-logo">
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none">
+            <path d="M12 3v4M12 17v4M3 12h4M17 12h4M5.6 5.6l2.8 2.8M15.6 15.6l2.8 2.8M18.4 5.6l-2.8 2.8M8.4 15.6l-2.8 2.8"
+              stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+          </svg>
+        </span>
+        <div class="mp-brand-text">
+          <span class="mp-word">MetaPrompt</span>
+          <span class="mp-sub">prompt engine</span>
+        </div>
+        <span class="mp-ver">v2.3</span>
+      </div>
+      <button class="mp-icon-btn" id="settingsLink" title="Ayarlar">
+        <svg viewBox="0 0 24 24" width="17" height="17" fill="none">
+          <circle cx="12" cy="12" r="3.2" stroke="currentColor" stroke-width="1.6"/>
+          <path d="M12 2.5v2.2M12 19.3v2.2M21.5 12h-2.2M4.7 12H2.5M18.7 5.3l-1.6 1.6M6.9 17.1l-1.6 1.6M18.7 18.7l-1.6-1.6M6.9 6.9 5.3 5.3"
+            stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+        </svg>
+      </button>
+    </div>
+
+    <!-- ——— Body ——— -->
+    <div class="mp-pop-body">
+      <div class="mp-view">
+
+        <!-- Source text -->
+        <div class="mp-row-between">
+          <label class="mp-label" for="rawInput">Kaynak Metin</label>
+          <span class="mp-pill" id="fromPagePill" style="display:none">
+            <svg viewBox="0 0 24 24" fill="none">
+              <path d="M9 4.5a1.6 1.6 0 0 1 3.2 0c0 .5.4.9.9.9h2.1a1 1 0 0 1 1 1v2.1c0 .5.4.9.9.9a1.6 1.6 0 0 1 0 3.2c-.5 0-.9.4-.9.9v2.6a1 1 0 0 1-1 1h-2.6c-.5 0-.9-.4-.9-.9a1.6 1.6 0 0 0-3.2 0c0 .5-.4.9-.9.9H6.5a1 1 0 0 1-1-1v-2.6c0-.5-.4-.9-.9-.9a1.6 1.6 0 0 1 0-3.2c.5 0 .9-.4.9-.9V6.4a1 1 0 0 1 1-1h1.6c.5 0 .9-.4.9-.9Z"
+                stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/>
+            </svg>
+            sayfadan
+          </span>
+        </div>
+        <textarea class="mp-source" id="rawInput" spellcheck="false"
+          placeholder="Bir metin seçin veya buraya yazın…"></textarea>
+
+        <!-- Controls: language + length -->
+        <div class="mp-controls">
+          <div class="mp-ctrl">
+            <label class="mp-label tiny" for="langSelect">
+              <svg viewBox="0 0 24 24" fill="none">
+                <circle cx="12" cy="12" r="8.4" stroke="currentColor" stroke-width="1.5"/>
+                <path d="M3.6 12h16.8M12 3.6c2.4 2.3 2.4 14.5 0 16.8M12 3.6c-2.4 2.3-2.4 14.5 0 16.8"
+                  stroke="currentColor" stroke-width="1.5"/>
+              </svg>
+              Çıktı
+            </label>
+            <div class="mp-select-wrap">
+              <select class="mp-select" id="langSelect">
+                <option value="auto">Otomatik</option>
+                <option value="tr">Türkçe</option>
+                <option value="en">English</option>
+              </select>
+              <span class="mp-select-chev">
+                <svg viewBox="0 0 24 24" width="15" height="15" fill="none">
+                  <path d="M6 9l6 6 6-6" stroke="currentColor" stroke-width="1.7"
+                    stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+              </span>
+            </div>
+          </div>
+
+          <div class="mp-ctrl">
+            <span class="mp-label tiny">
+              <svg viewBox="0 0 24 24" fill="none">
+                <path d="M13 2 4.5 13.5H11l-1 8.5L19.5 10H13l0-8Z"
+                  stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/>
+              </svg>
+              Uzunluk
+            </span>
+            <div class="mp-seg small" id="lenSeg">
+              <button class="mp-seg-btn" data-val="kisa">Kısa</button>
+              <button class="mp-seg-btn on" data-val="orta">Orta</button>
+              <button class="mp-seg-btn" data-val="uzun">Uzun</button>
+            </div>
+            <!-- hidden select synced by popup.js -->
+            <select id="lenSelect" style="display:none">
+              <option value="kisa">Kisa</option>
+              <option value="orta" selected>Orta</option>
+              <option value="uzun">Uzun</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- Revise button -->
+        <button class="mp-btn accent full revise" id="revizeEtBtn">
+          <svg class="btn-spark" viewBox="0 0 24 24" width="15" height="15" fill="none">
+            <path d="M12 3v4M12 17v4M3 12h4M17 12h4M5.6 5.6l2.8 2.8M15.6 15.6l2.8 2.8M18.4 5.6l-2.8 2.8M8.4 15.6l-2.8 2.8"
+              stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+          </svg>
+          <span class="btn-label">Uzman Prompt'a Revize Et</span>
+          <span class="mp-spin btn-spin"></span>
+          <span class="btn-step"></span>
+          <span class="mp-progress" id="reviseProgress" style="width:0%"></span>
+        </button>
+
+        <!-- Status messages -->
+        <div id="status" class="mp-status"></div>
+
+        <!-- Done bar (visible after successful revision) -->
+        <div class="mp-done-bar" id="doneBar" style="display:none">
+          <span class="mp-done-dot"></span>
+          <span id="doneMsg">Tamamlandı</span>
+          <button class="mp-ghost-mini" id="redoBtn">Yeniden</button>
+        </div>
+
+        <!-- Result section (visible after successful revision) -->
+        <div id="resultSection" style="display:none">
+          <div class="mp-tabs">
+            <button class="mp-tab on">Prompt</button>
+          </div>
+          <div class="mp-tabpane">
+            <textarea id="output" readonly spellcheck="false"
+              placeholder="Revize edilmiş uzman prompt burada görünecek…"></textarea>
+          </div>
+          <div class="mp-actions">
+            <button class="mp-btn ghost" id="copyBtn">
+              <svg viewBox="0 0 24 24" width="15" height="15" fill="none">
+                <rect x="9" y="9" width="11" height="11" rx="2.5" stroke="currentColor" stroke-width="1.6"/>
+                <path d="M5 15.5A2 2 0 0 1 4 14V6a2 2 0 0 1 2-2h8a2 2 0 0 1 1.5.7"
+                  stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+              </svg>
+              <span class="copy-label">Kopyala</span>
+            </button>
+            <button class="mp-btn accent" id="writePageBtn">
+              <svg viewBox="0 0 24 24" width="15" height="15" fill="none">
+                <path d="M4 20h16M5 16.5 15.6 5.9a2 2 0 0 1 2.8 0l-.3-.3a2 2 0 0 1 0 2.8L7.5 19 4 20l1-3.5Z"
+                  stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/>
+              </svg>
+              <span class="write-label">Sayfaya Yaz</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Recent revisions (collapsible) -->
+        <div class="mp-recent" id="historyRow" style="display:none">
+          <button class="mp-recent-head" id="recentHead">
+            <svg viewBox="0 0 24 24" fill="none">
+              <circle cx="12" cy="12" r="8.2" stroke="currentColor" stroke-width="1.6"/>
+              <path d="M12 7.5V12l3 1.8" stroke="currentColor" stroke-width="1.6"
+                stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+            Son Revizyonlar
+            <span class="mp-recent-n" id="histCount">0</span>
+            <span class="mp-recent-chev" id="histChev">
+              <svg viewBox="0 0 24 24" width="14" height="14" fill="none">
+                <path d="M6 9l6 6 6-6" stroke="currentColor" stroke-width="1.7"
+                  stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+            </span>
+          </button>
+          <ul class="mp-recent-list" id="historyList" style="display:none"></ul>
+          <!-- hidden select kept for storage compat -->
+          <select id="historySelect" style="display:none"></select>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="popup.js"></script>
+</body>
+</html>

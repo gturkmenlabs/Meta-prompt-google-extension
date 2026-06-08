@@ -1,0 +1,38 @@
+{
+  "manifest_version": 3,
+  "name": "Meta-Prompt Motoru & Revizyon Sistemi",
+  "version": "2.3",
+  "description": "Sayfadaki metin kutusunu Claude/OpenRouter ile uzman prompt'a yerinde revize eder.",
+  "permissions": [
+    "contextMenus",
+    "storage"
+  ],
+  "host_permissions": [
+    "https://api.anthropic.com/*",
+    "https://openrouter.ai/*"
+  ],
+  "background": {
+    "service_worker": "background.js",
+    "type": "module"
+  },
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["content.js"],
+      "run_at": "document_idle"
+    }
+  ],
+  "action": {
+    "default_popup": "popup.html"
+  },
+  "options_page": "options.html",
+  "commands": {
+    "revise-in-place": {
+      "suggested_key": {
+        "default": "Ctrl+Shift+L",
+        "mac": "Command+Shift+L"
+      },
+      "description": "Aktif metin kutusunu yerinde revize et"
+    }
+  }
+}
