@@ -1,4 +1,4 @@
-import { BrainNetwork, Neuron, Synapse, BIOPHYSICAL_CONSTANTS } from "/Users/gokhan/Desktop/Meta Prompt kopyası/brain_network.js";
+import { BrainNetwork, Neuron, Synapse, BIOPHYSICAL_CONSTANTS } from "./brain_network.js";
 
 console.log("=================================================");
 console.log("      ANA BEYIN ADVANCED VALIDATION RUNNER       ");

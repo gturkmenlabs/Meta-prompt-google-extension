@@ -1,13 +1,19 @@
 import { BrainNetwork } from "./brain_network.js";
+import { VIBE_STRATEGY_REGISTRY } from "./prompt.js";
 
 const BRAIN_STORAGE_KEY = "ana_beyin_state";
 const NUM_NEURONS = 30;
+
+let cachedNetworkInstance = null;
 
 /**
  * Loads the SNN brain network state from chrome.storage.local.
  * If no state exists, it initializes a default network and saves it.
  */
 export async function getBrainNetwork() {
+  if (cachedNetworkInstance) {
+    return cachedNetworkInstance;
+  }
   const data = await chrome.storage.local.get(BRAIN_STORAGE_KEY);
   const network = new BrainNetwork();
   
@@ -17,6 +23,7 @@ export async function getBrainNetwork() {
     network.initializeDefaultNetwork(NUM_NEURONS);
     await saveBrainNetwork(network);
   }
+  cachedNetworkInstance = network;
   return network;
 }
 
@@ -24,6 +31,7 @@ export async function getBrainNetwork() {
  * Saves the SNN brain network state to chrome.storage.local.
  */
 export async function saveBrainNetwork(network) {
+  cachedNetworkInstance = network;
   const exported = network.exportState();
   await chrome.storage.local.set({ [BRAIN_STORAGE_KEY]: exported });
 }
@@ -40,11 +48,13 @@ export async function runBrainSimulation(taskType) {
   
   const externalInputs = {};
   
-  // Set up inputs to stimulate specific neural sub-populations:
-  // - Focus Group (Neurons 1-10): Drives Acetylcholine (ACh)
-  // - Exploration Group (Neurons 11-20): Drives Norepinephrine (NE)
-  // - Integration Group (Neurons 21-30): Drives Dopamine (DA) base
-  if (taskType === "coding") {
+  if (taskType && taskType.startsWith("vibecoding_")) {
+    const strategy = taskType.split("_")[1];
+    const strategyConfig = VIBE_STRATEGY_REGISTRY[strategy] || VIBE_STRATEGY_REGISTRY.standard;
+    const inputs = strategyConfig.snnInputs || { focus: 110.0, explore: 2.0 };
+    for (let i = 1; i <= 10; i++) externalInputs[i] = inputs.focus;
+    for (let i = 11; i <= 20; i++) externalInputs[i] = inputs.explore;
+  } else if (taskType === "coding") {
     // High focus / low noise excitation
     for (let i = 1; i <= 10; i++) externalInputs[i] = 110.0;
     for (let i = 11; i <= 20; i++) externalInputs[i] = 2.0;
@@ -56,6 +66,22 @@ export async function runBrainSimulation(taskType) {
     // Low focus / high exploration excitation
     for (let i = 1; i <= 10; i++) externalInputs[i] = 2.0;
     for (let i = 11; i <= 20; i++) externalInputs[i] = 110.0;
+  } else if (taskType === "translation" || taskType === "summary") {
+    // Sadakat gorevleri: cok yuksek odak, minimum kesif (kaynak metne bagli kal)
+    for (let i = 1; i <= 10; i++) externalInputs[i] = 105.0;
+    for (let i = 11; i <= 20; i++) externalInputs[i] = 5.0;
+  } else if (taskType === "email") {
+    // Ton kalibrasyonu: yuksek odak + hafif kesif (uslup secenekleri)
+    for (let i = 1; i <= 10; i++) externalInputs[i] = 90.0;
+    for (let i = 11; i <= 20; i++) externalInputs[i] = 15.0;
+  } else if (taskType === "explain") {
+    // Ogretme: dengeli odak + analoji icin orta kesif
+    for (let i = 1; i <= 10; i++) externalInputs[i] = 70.0;
+    for (let i = 11; i <= 20; i++) externalInputs[i] = 45.0;
+  } else if (taskType === "planning") {
+    // Planlama: yuksek odak + sistematik akil yurutme (analysis benzeri)
+    for (let i = 1; i <= 10; i++) externalInputs[i] = 85.0;
+    for (let i = 21; i <= 30; i++) externalInputs[i] = 45.0;
   } else {
     // General tasks have a moderate excitation profile
     for (let i = 1; i <= 30; i++) {
@@ -63,7 +89,6 @@ export async function runBrainSimulation(taskType) {
     }
   }
 
-  // Run SNN simulation for 80 steps to allow membrane integration
   const dt = 1.0;
   for (let tick = 0; tick < 80; tick++) {
     const time = tick * dt;

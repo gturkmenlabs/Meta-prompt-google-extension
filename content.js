@@ -4,6 +4,12 @@
 
 (() => {
   let lastEditable = null;
+  // Son SET_EDITABLE_TEXT oncesi durum; RESTORE_EDITABLE_TEXT ile geri alinir.
+  let undoState = null; // { el, prevText }
+  // Devam eden akisli yazim: hedef element ve akis ONCESI metin. Undo anlik
+  // goruntusu akisin ilk yaziminda BIR KEZ alinir; her delta'da alinsaydi
+  // geri alma yarim ciktiya donerdi.
+  let streamState = null; // { el, prevText }
 
   const isEditable = (el) => {
     if (!el || el.nodeType !== 1) return false;
@@ -79,7 +85,47 @@
         sendResponse({ ok: false });
       } else {
         try {
+          undoState = { el, prevText: readText(el) };
           writeText(el, msg.text);
+          sendResponse({ ok: true });
+        } catch (error) {
+          sendResponse({ ok: false, error: String(error && error.message) });
+        }
+      }
+    } else if (msg.type === "STREAM_EDITABLE_TEXT") {
+      // Akisli yazim: her mesaj o ana kadarki TAM metni tasir; done=true son
+      // mesajdir ve undo durumunu akis oncesi metne baglar.
+      try {
+        if (!streamState) {
+          const el = currentTarget();
+          if (!el) {
+            sendResponse({ ok: false });
+            return true;
+          }
+          streamState = { el, prevText: readText(el) };
+        }
+        if (!document.contains(streamState.el)) {
+          streamState = null;
+          sendResponse({ ok: false, reason: "target-lost" });
+          return true;
+        }
+        writeText(streamState.el, msg.text);
+        if (msg.done) {
+          undoState = streamState;
+          streamState = null;
+        }
+        sendResponse({ ok: true });
+      } catch (error) {
+        streamState = null;
+        sendResponse({ ok: false, error: String(error && error.message) });
+      }
+    } else if (msg.type === "RESTORE_EDITABLE_TEXT") {
+      if (!undoState || !document.contains(undoState.el)) {
+        sendResponse({ ok: false, reason: "no-undo" });
+      } else {
+        try {
+          writeText(undoState.el, undoState.prevText);
+          undoState = null;
           sendResponse({ ok: true });
         } catch (error) {
           sendResponse({ ok: false, error: String(error && error.message) });

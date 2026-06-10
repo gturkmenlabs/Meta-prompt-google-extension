@@ -60,3 +60,29 @@ export async function getActiveConfig() {
     model: stored[meta.modelField] || meta.defaultModel
   };
 }
+
+// Failover icin tam plan: aktif model + yedek model listesi + tum anahtarlar.
+// Hem popup (REVISE_PROMPT) hem kisayol/sag-tik (reviseInPlace) yollari bunu
+// kullanir; model listesi mantigi tek yerde kalsin.
+export async function getFailoverConfig() {
+  const stored = await chrome.storage.local.get([...ALL_FIELDS, "openrouterWorkingModels"]);
+  const provider = stored.provider || DEFAULT_PROVIDER;
+  const meta = PROVIDERS[provider] || PROVIDERS[DEFAULT_PROVIDER];
+  const apiKeys = {
+    anthropic: stored.anthropicKey || "",
+    openrouter: stored.openrouterKey || ""
+  };
+  const activeModel = stored[meta.modelField] || meta.defaultModel;
+
+  const working = stored.openrouterWorkingModels || [];
+  let models = [activeModel];
+  if (provider === "openrouter") {
+    models = [activeModel, ...working.map((m) => m.id).filter((id) => id && id !== activeModel)];
+  } else if (apiKeys.openrouter) {
+    // Anthropic aktifken OpenRouter anahtari varsa, dogrulanmis modelleri
+    // capraz yedek olarak ekle (api.js detectProvider dogru anahtari secer).
+    models = [activeModel, ...working.map((m) => m.id).filter(Boolean)];
+  }
+
+  return { provider, apiKey: apiKeys[provider], apiKeys, models };
+}
