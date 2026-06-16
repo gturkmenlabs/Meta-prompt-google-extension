@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
-  "name": "Meta-Prompt Motoru & Revizyon Sistemi",
+  "name": "Meta-Prompt Engine & Revision System",
   "version": "2.5",
-  "description": "Sayfadaki metin kutusunu Claude/OpenRouter ile uzman prompt'a yerinde revize eder.",
+  "description": "Revises the text box on the page in place into an expert prompt using Claude/OpenRouter.",
   "permissions": [
     "contextMenus",
     "storage"
@@ -44,14 +44,14 @@
         "default": "Ctrl+Shift+L",
         "mac": "Command+Shift+L"
       },
-      "description": "Aktif metin kutusunu yerinde revize et"
+      "description": "Revise the active text box in place"
     },
     "undo-revise": {
       "suggested_key": {
         "default": "Ctrl+Shift+U",
         "mac": "Command+Shift+U"
       },
-      "description": "Son yerinde revizyonu geri al"
+      "description": "Undo the last in-place revision"
     }
   }
 }

@@ -1,5 +1,5 @@
-// Revizyon background'daki port kanali uzerinden yapilir; popup yalnizca
-// yapilandirma okur. prompt.js/api.js buraya import edilmemeli (gereksiz yuk).
+// Revision happens over the background's port channel; the popup only reads
+// configuration. prompt.js/api.js must not be imported here (unnecessary load).
 import { getActiveConfig } from "./config.js";
 
 
@@ -37,7 +37,7 @@ function decryptText(ciphertext, key) {
     }
     return result;
   } catch (e) {
-    console.error("Geçmiş verisi çözülemedi:", e);
+    console.error("Could not decrypt history data:", e);
     return "";
   }
 }
@@ -50,70 +50,70 @@ function sanitizeForHistory(text) {
   return cleaned;
 }
 
-// "Çıktı" (dil) ve "Uzunluk" aciklamalari (secime gore arayuzde gosterilir).
+// "Output" (language) and "Length" descriptions (shown in the UI per selection).
 const LANG_DESCS = {
-  auto: "Ham metnin diliyle aynı dilde üretir.",
-  tr:   "Çıktı her zaman Türkçe olur.",
-  en:   "Çıktı her zaman İngilizce olur."
+  auto: "Produces output in the same language as the raw text.",
+  tr:   "Output is always Turkish.",
+  en:   "Output is always English."
 };
 
 const LEN_DESCS = {
-  kisa: "Sıkı ve öz (~600 karakter): yalnızca çekirdek rol, görev ve kısıtlamalar.",
-  orta: "Dengeli (600–1500 karakter): rol, görev, yöntem ve kısıtlamalar.",
-  uzun: "Ayrıntılı (1500–3500 karakter): iş akışı adımları, rubrikler, gerekirse örnek.",
-  maks: "Eksiksiz: tüm bölümler, doğrulama protokolü ve örneklerle (8192 token)."
+  kisa: "Tight and concise (~600 characters): only the core role, task, and constraints.",
+  orta: "Balanced (600–1500 characters): role, task, method, and constraints.",
+  uzun: "Detailed (1500–3500 characters): workflow steps, rubrics, and an example if needed.",
+  maks: "Complete: all sections, verification protocol, and examples (8192 tokens)."
 };
 
-// "Geliştirme Modu" ve strateji aciklamalari (secime gore arayuzde gosterilir).
+// "Development Mode" and strategy descriptions (shown in the UI per selection).
 const MODE_DESCS = {
-  standard:   "Dengeli meta-prompt: rol, görev, yöntem ve kısıtlamalarla genel amaçlı uzman prompt üretir.",
-  vibecoding: "Kod üretimi için akış odaklı prompt: mimari sezgi ile mühendislik disiplinini birleştirir.",
-  research:   "Web/akademik araştırma prompt'u: arama operatörleri, kaynak ve atıf stratejileri ekler.",
-  antihallu:  "Doğruluk odaklı prompt: kaynak doğrulama ve kendini denetleme teknikleriyle halüsinasyonu azaltır."
+  standard:   "Balanced meta-prompt: produces a general-purpose expert prompt with role, task, method, and constraints.",
+  vibecoding: "Flow-focused prompt for code generation: combines architectural intuition with engineering discipline.",
+  research:   "Web/academic research prompt: adds search operators, source, and citation strategies.",
+  antihallu:  "Accuracy-focused prompt: reduces hallucination with source verification and self-checking techniques."
 };
 
 const STRATEGY_DESCS = {
   vibecoding: {
-    auto:        "Metnindeki niyete göre en uygun vibe stratejisi otomatik seçilir.",
-    standard:    "Hibrit mühendislik: yapı ve yaratıcılık dengesi, üretim kalitesi odaklı.",
-    jazz:        "Doğaçlama akışı: hızlı keşif, deneysel ve cesur çözümler.",
-    fractal:     "Küçük bir çekirdekten organik olarak büyüyen, kendini tekrarlayan mimari.",
-    emotive:     "Kullanıcı deneyimi ve duygu durumunu merkeze alan tasarım yaklaşımı.",
-    hydrological:"Veri akışını merkeze alır: kaynaktan denize, katmanlar arası doğal akış.",
-    alchemical:  "Mevcut kodu adım adım damıtarak dönüştürme (refactor) odaklı."
+    auto:        "Automatically picks the most suitable vibe strategy based on the intent in your text.",
+    standard:    "Hybrid engineering: balance of structure and creativity, focused on production quality.",
+    jazz:        "Improvisational flow: rapid exploration, experimental and bold solutions.",
+    fractal:     "A self-repeating architecture that grows organically from a small core.",
+    emotive:     "A design approach centered on user experience and emotional state.",
+    hydrological:"Centers the data flow: a natural flow from source to sea, across layers.",
+    alchemical:  "Focused on transforming existing code by distilling it step by step (refactor)."
   },
   research: {
-    auto:          "Metnindeki niyete göre en uygun araştırma stratejisi otomatik seçilir.",
-    comprehensive: "Tüm arama tekniklerini tek prompt'ta birleştirir.",
-    web:           "Boolean operatörleri ve Google dorking ile hassas web araması.",
-    academic:      "Google Scholar, atıf zinciri ve hakemli kaynak odaklı tarama.",
-    osint:         "Açık kaynak istihbarat (OSINT) teknikleri ağırlıklı sorgular.",
-    paywall:       "Yasal erişim yolları: açık arşivler, ön baskılar, kurumsal erişim.",
-    literature:    "PRISMA tarzı sistematik literatür tarama protokolü kurar."
+    auto:          "Automatically picks the most suitable research strategy based on the intent in your text.",
+    comprehensive: "Combines all search techniques into a single prompt.",
+    web:           "Precise web search using Boolean operators and Google dorking.",
+    academic:      "Scanning focused on Google Scholar, citation chains, and peer-reviewed sources.",
+    osint:         "Queries weighted toward open-source intelligence (OSINT) techniques.",
+    paywall:       "Legal access routes: open archives, preprints, institutional access.",
+    literature:    "Sets up a PRISMA-style systematic literature review protocol."
   },
   antihallu: {
-    auto:     "Metnindeki niyete göre en uygun teknik otomatik seçilir.",
-    ensemble: "RAG + ReAct + CoN + CoVe tekniklerini birlikte uygular.",
-    rag:      "Yanıtı yalnızca verilen/getirilen kaynaklarla sınırlar.",
-    react:    "Akıl yürütme + araç kullanımı döngüsüyle adım adım doğrulama.",
-    con:      "Kaynakları not alıp güvenilirliğine göre filtreler (Chain-of-Note).",
-    cok:      "Dinamik kanıt toplayarak bilgi zinciri kurar (Chain-of-Knowledge).",
-    logicot:  "Sembolik mantıkla her adımı doğrular (LogiCoT).",
-    cove:     "Modele kendi yanıtını doğrulatır (Chain-of-Verification).",
-    atomic:   "Yanıtı atomik iddialara böler, her birini kaynakla eşler ve revize eder (FActScore + RARR).",
-    selfcheck: "Çoklu bağımsız taslak üretip tutarsız iddiaları işaretler; bağlam-önbilgi çelişkisinde bağlamı esas alır.",
-    triangulate: "Kodu, ters/eşlenik problemin bağımsız çözümüyle çapraz doğrular; uyuşmazsa çekimser kalır (Semantik Triangülasyon)."
+    auto:     "Automatically picks the most suitable technique based on the intent in your text.",
+    ensemble: "Applies RAG + ReAct + CoN + CoVe techniques together.",
+    rag:      "Limits the answer strictly to the provided/retrieved sources.",
+    react:    "Step-by-step verification via a reasoning + tool-use loop.",
+    con:      "Notes sources and filters them by reliability (Chain-of-Note).",
+    cok:      "Builds a knowledge chain by dynamically gathering evidence (Chain-of-Knowledge).",
+    logicot:  "Verifies each step with symbolic logic (LogiCoT).",
+    cove:     "Has the model verify its own answer (Chain-of-Verification).",
+    atomic:   "Splits the answer into atomic claims, maps each to a source, and revises (FActScore + RARR).",
+    selfcheck: "Generates multiple independent drafts and flags inconsistent claims; on context vs. prior-knowledge conflicts, defers to the context.",
+    triangulate: "Cross-verifies the code with an independent solution to the inverse/conjugate problem; abstains on a mismatch (Semantic Triangulation)."
   }
 };
 
 const REVISE_STEPS = [
-  "Ham niyet ve hedef uzmanlık analiz ediliyor…",
-  "Yüklü çerçeveleme nötralize ediliyor…",
-  "Dürüstlük talimatı ve anti-sycophancy ekleniyor…",
-  "Nesnel değerlendirme rubrikleri yapılandırılıyor…",
-  "Sistematik muhakeme ve düşünce blokları kuruluyor…",
-  "Aşamalı iş akışı ve değişken etiketleri yerleştiriliyor…",
-  "Kısıtlamalar belirlenip ROL · GÖREV · YÖNTEM yapılandırılıyor…",
+  "Analyzing raw intent and target expertise…",
+  "Neutralizing loaded framing…",
+  "Adding honesty directive and anti-sycophancy…",
+  "Structuring objective evaluation rubrics…",
+  "Building systematic reasoning and thought blocks…",
+  "Placing the staged workflow and variable labels…",
+  "Setting constraints and structuring ROLE · TASK · METHOD…",
 ];
 
 document.addEventListener("DOMContentLoaded", () => {
@@ -186,10 +186,10 @@ document.addEventListener("DOMContentLoaded", () => {
     const m = Math.floor(diff / 60000);
     const h = Math.floor(diff / 3600000);
     const d = Math.floor(diff / 86400000);
-    if (m < 1) return "Az önce";
-    if (m < 60) return `${m}d önce`;
-    if (h < 24) return `${h}s önce`;
-    return `${d}g önce`;
+    if (m < 1) return "Just now";
+    if (m < 60) return `${m}m ago`;
+    if (h < 24) return `${h}h ago`;
+    return `${d}d ago`;
   };
 
   // ——— Output (language/length) descriptions ———
@@ -263,7 +263,7 @@ document.addEventListener("DOMContentLoaded", () => {
   };
 
   // ——— History ———
-  // Verilen listeyi sifreleyip kaydeder ve arayuzu tazeler (tek kayit noktasi).
+  // Encrypts and saves the given list, then refreshes the UI (single write point).
   const persistHistory = async (items) => {
     const key = await getOrCreateEncryptionKey();
     const encryptedHistory = items.map((item) => ({
@@ -289,7 +289,7 @@ document.addEventListener("DOMContentLoaded", () => {
     if (histCount) histCount.textContent = history.length;
 
     // Keep hidden select in sync (used by legacy change handler below)
-    const options = ['<option value="">— Gecmisten sec —</option>'];
+    const options = ['<option value="">— Pick from history —</option>'];
     history.forEach((item, index) => {
       const preview = escapeHtml(item.raw.slice(0, 40).replace(/\s+/g, " "));
       options.push(`<option value="${index}">${preview}…</option>`);
@@ -306,16 +306,16 @@ document.addEventListener("DOMContentLoaded", () => {
       li.innerHTML =
         `<span class="mp-recent-txt">${escapeHtml(item.raw.slice(0, 52).replace(/\s+/g, " "))}</span>` +
         (when ? `<span class="mp-recent-when">${when}</span>` : "") +
-        `<button class="mp-recent-del" title="Bu kaydı sil">✕</button>`;
+        `<button class="mp-recent-del" title="Delete this entry">✕</button>`;
       li.addEventListener("click", () => {
         rawInput.value = item.raw;
         output.value = item.result;
-        if (doneMsg) doneMsg.textContent = "Geçmişten yüklendi";
+        if (doneMsg) doneMsg.textContent = "Loaded from history";
         showResult();
         setStatus("", "info");
       });
       li.querySelector(".mp-recent-del").addEventListener("click", (e) => {
-        e.stopPropagation(); // satira tiklama (yukleme) tetiklenmesin
+        e.stopPropagation(); // don't trigger the row click (load)
         deleteHistoryItem(index);
       });
       historyList.appendChild(li);
@@ -359,7 +359,7 @@ document.addEventListener("DOMContentLoaded", () => {
       }
       if (data.lastInPlaceResult) {
         output.value = data.lastInPlaceResult;
-        if (doneMsg) doneMsg.textContent = "Yerinde revize sonucu";
+        if (doneMsg) doneMsg.textContent = "In-place revision result";
         showResult();
       }
       if (data.lastError) setStatus(data.lastError, "error");
@@ -436,7 +436,7 @@ document.addEventListener("DOMContentLoaded", () => {
     if (item) {
       rawInput.value = item.raw;
       output.value = item.result;
-      if (doneMsg) doneMsg.textContent = "Geçmişten yüklendi";
+      if (doneMsg) doneMsg.textContent = "Loaded from history";
       showResult();
       setStatus("", "info");
     }
@@ -456,7 +456,7 @@ document.addEventListener("DOMContentLoaded", () => {
   // ——— Clear all history ———
   if (histClearBtn) {
     histClearBtn.addEventListener("click", async () => {
-      if (!confirm("Tüm revizyon geçmişi silinsin mi?")) return;
+      if (!confirm("Delete all revision history?")) return;
       await persistHistory([]);
     });
   }
@@ -474,17 +474,17 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
 
-  // ——— Revize ———
+  // ——— Revise ———
   revizeEtBtn.addEventListener("click", async () => {
-    const hamMetin = rawInput.value.trim();
-    if (!hamMetin) {
-      setStatus("Lütfen önce bir metin seçin veya yazın.", "error");
+    const rawText = rawInput.value.trim();
+    if (!rawText) {
+      setStatus("Please select or type some text first.", "error");
       return;
     }
 
     const { apiKey } = await getActiveConfig();
     if (!apiKey) {
-      setStatus("API anahtarı yok. Ayarlar'dan ekleyin.", "error");
+      setStatus("No API key. Add one in Settings.", "error");
       return;
     }
 
@@ -513,8 +513,8 @@ document.addEventListener("DOMContentLoaded", () => {
       if (reviseProgress) reviseProgress.style.width = pct + "%";
     }, 550);
 
-    // Akisli revizyon: background ile kalici port ac, sonucu delta'lar
-    // halinde geldikce goster.
+    // Streaming revision: open a persistent port to the background and show the
+    // result as it arrives in deltas.
     try {
       const port = chrome.runtime.connect({ name: "revise" });
       let streamed = "";
@@ -523,10 +523,10 @@ document.addEventListener("DOMContentLoaded", () => {
       port.onMessage.addListener(async (response) => {
         if (response.type === "delta") {
           if (!streamed) {
-            // Ilk parca: sonuc alanini ac, adim animasyonunu durdur.
+            // First chunk: open the result area, stop the step animation.
             clearInterval(stepInterval);
             stepInterval = null;
-            if (doneMsg) doneMsg.textContent = "Yazılıyor…";
+            if (doneMsg) doneMsg.textContent = "Writing…";
             showResult();
           }
           streamed += response.text;
@@ -537,7 +537,7 @@ document.addEventListener("DOMContentLoaded", () => {
         }
 
         if (response.type === "checking") {
-          if (doneMsg) doneMsg.textContent = "Hakem model denetliyor…";
+          if (doneMsg) doneMsg.textContent = "Judge model reviewing…";
           return;
         }
 
@@ -546,7 +546,7 @@ document.addEventListener("DOMContentLoaded", () => {
         finished = true;
 
         if (response.type === "error") {
-          setStatus(response.error || "Arka plan hatası oluştu", "error");
+          setStatus(response.error || "A background error occurred", "error");
           if (!streamed) hideResult();
           resetReviseBtn();
           port.disconnect();
@@ -573,18 +573,18 @@ document.addEventListener("DOMContentLoaded", () => {
           if (consensus.status === "ok") {
             consensusLabel = ` · ✓✓ ${(consensus.judgeModel || "").split("/").pop()}`;
           } else if (consensus.status === "issues") {
-            const judge = (consensus.judgeModel || "hakem").split("/").pop();
-            setStatus(`Konsensüs uyarısı (${judge}):\n${consensus.issues}`, "error");
+            const judge = (consensus.judgeModel || "judge").split("/").pop();
+            setStatus(`Consensus warning (${judge}):\n${consensus.issues}`, "error");
           }
         }
         if (doneMsg) {
           doneMsg.textContent = fellBack
-            ? `Hazır · ${shortModel} (yedek)${autoLabel}${consensusLabel}${snnStats}`
-            : `Hazır · ${shortModel}${autoLabel}${consensusLabel}${snnStats}`;
+            ? `Ready · ${shortModel} (backup)${autoLabel}${consensusLabel}${snnStats}`
+            : `Ready · ${shortModel}${autoLabel}${consensusLabel}${snnStats}`;
         }
 
         showResult();
-        await saveToHistory(hamMetin, result);
+        await saveToHistory(rawText, result);
         resetReviseBtn();
         port.disconnect();
       });
@@ -593,7 +593,7 @@ document.addEventListener("DOMContentLoaded", () => {
         if (finished) return;
         clearInterval(stepInterval);
         stepInterval = null;
-        setStatus("Arka planla bağlantı koptu. Tekrar deneyin.", "error");
+        setStatus("Lost connection to the background. Try again.", "error");
         if (!streamed) hideResult();
         resetReviseBtn();
       });
@@ -606,7 +606,7 @@ document.addEventListener("DOMContentLoaded", () => {
         vibeStrategy,
         researchStrategy,
         antihalluStrategy,
-        rawText: hamMetin
+        rawText: rawText
       });
     } catch (error) {
       clearInterval(stepInterval);
@@ -629,43 +629,43 @@ document.addEventListener("DOMContentLoaded", () => {
     try {
       await navigator.clipboard.writeText(output.value);
       copyBtn.classList.add("flash");
-      if (copyLabel) copyLabel.textContent = "Kopyalandı";
+      if (copyLabel) copyLabel.textContent = "Copied";
       setTimeout(() => {
         copyBtn.classList.remove("flash");
-        if (copyLabel) copyLabel.textContent = "Kopyala";
+        if (copyLabel) copyLabel.textContent = "Copy";
       }, 1400);
       sendBrainReward(1.0); // positive LTP reward
     } catch (error) {
-      setStatus(`Kopyalanamadı: ${error.message}`, "error");
+      setStatus(`Could not copy: ${error.message}`, "error");
     }
   });
 
   // ——— Write to page ———
   writePageBtn.addEventListener("click", async () => {
     if (!output.value) {
-      setStatus("Önce bir prompt üretin.", "error");
+      setStatus("Generate a prompt first.", "error");
       return;
     }
     const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
     if (!tab || tab.id == null) {
-      setStatus("Aktif sekme bulunamadı.", "error");
+      setStatus("No active tab found.", "error");
       return;
     }
     const writeLabel = writePageBtn.querySelector(".write-label");
     chrome.tabs.sendMessage(tab.id, { type: "SET_EDITABLE_TEXT", text: output.value }, (resp) => {
       if (chrome.runtime.lastError) {
-        setStatus("Sayfaya ulaşılamadı. Sayfayı yenileyip tekrar deneyin.", "error");
+        setStatus("Could not reach the page. Refresh the page and try again.", "error");
       } else if (resp && resp.ok) {
         writePageBtn.classList.add("flash");
-        if (writeLabel) writeLabel.textContent = "Yazıldı ✓";
+        if (writeLabel) writeLabel.textContent = "Written ✓";
         setTimeout(() => {
           writePageBtn.classList.remove("flash");
-          if (writeLabel) writeLabel.textContent = "Sayfaya Yaz";
+          if (writeLabel) writeLabel.textContent = "Write to Page";
         }, 1600);
         setStatus("", "info");
         sendBrainReward(1.0); // positive LTP reward
       } else {
-        setStatus("Sayfada yazılabilir kutu yok. Kutuya tıklayıp tekrar deneyin.", "error");
+        setStatus("No writable box on the page. Click a box and try again.", "error");
       }
     });
   });

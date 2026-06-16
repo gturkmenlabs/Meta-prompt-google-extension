@@ -1,14 +1,14 @@
-// Sayfaya enjekte olur. Aktif duzenlenebilir alani (textarea, input veya
-// contenteditable; orn. Gemini/ChatGPT prompt kutusu) takip eder; background'in
-// istegiyle metni okur ve revize edilmis metni ayni kutuya geri yazar.
+// Injected into the page. Tracks the active editable field (textarea, input, or
+// contenteditable; e.g. the Gemini/ChatGPT prompt box); on the background's
+// request it reads the text and writes the revised text back into the same box.
 
 (() => {
   let lastEditable = null;
-  // Son SET_EDITABLE_TEXT oncesi durum; RESTORE_EDITABLE_TEXT ile geri alinir.
+  // State before the last SET_EDITABLE_TEXT; undone via RESTORE_EDITABLE_TEXT.
   let undoState = null; // { el, prevText }
-  // Devam eden akisli yazim: hedef element ve akis ONCESI metin. Undo anlik
-  // goruntusu akisin ilk yaziminda BIR KEZ alinir; her delta'da alinsaydi
-  // geri alma yarim ciktiya donerdi.
+  // Ongoing streaming write: target element and the text BEFORE the stream. The
+  // undo snapshot is taken ONCE on the stream's first write; if it were taken on
+  // every delta, undo would revert to partial output.
   let streamState = null; // { el, prevText }
 
   const isEditable = (el) => {
@@ -22,8 +22,8 @@
     return el.isContentEditable === true;
   };
 
-  // Odak duzenlenebilir bir alana geldiyse hatirla (sag tik odagi bozsa bile
-  // en son kutuya yazabilelim).
+  // Remember when focus lands on an editable field (so we can still write to the
+  // last box even if a right-click breaks focus).
   document.addEventListener(
     "focusin",
     (e) => {
@@ -43,7 +43,7 @@
 
   const writeText = (el, text) => {
     el.focus();
-    // Tum mevcut icerigi sec.
+    // Select all current content.
     if (el.isContentEditable) {
       const sel = window.getSelection();
       sel.removeAllRanges();
@@ -54,8 +54,8 @@
       el.select();
     }
 
-    // insertText, React/Angular gibi framework'lerin dinledigi gercek input
-    // olaylarini tetikler (dogrudan value atamasi cogu zaman algilanmaz).
+    // insertText fires the real input events that frameworks like React/Angular
+    // listen for (a direct value assignment often goes undetected).
     let ok = false;
     try {
       ok = document.execCommand("insertText", false, text);
@@ -64,7 +64,7 @@
     }
 
     if (!ok) {
-      // Yedek yol.
+      // Fallback path.
       if (el.isContentEditable) {
         el.innerText = text;
       } else {
@@ -93,8 +93,8 @@
         }
       }
     } else if (msg.type === "STREAM_EDITABLE_TEXT") {
-      // Akisli yazim: her mesaj o ana kadarki TAM metni tasir; done=true son
-      // mesajdir ve undo durumunu akis oncesi metne baglar.
+      // Streaming write: each message carries the FULL text so far; done=true is
+      // the last message and binds the undo state to the pre-stream text.
       try {
         if (!streamState) {
           const el = currentTarget();
@@ -132,6 +132,6 @@
         }
       }
     }
-    return true; // async sendResponse icin
+    return true; // for async sendResponse
   });
 })();
