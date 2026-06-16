@@ -1,72 +1,72 @@
-# Meta-Prompt Motoru & Revizyon Sistemi 🚀
+# Meta-Prompt Engine & Revision System 🚀
 
-Bu proje, web sayfalarındaki metin kutularında (input/textarea) yer alan sıradan metinleri, Claude (Anthropic Messages API) veya OpenRouter entegrasyonu sayesinde **uzman düzeyinde prompt'lara (meta-prompt)** yerinde revize eden modern bir Google Chrome uzantısıdır (Manifest V3).
-
----
-
-## ✨ Özellikler
-
-- **Yerinde Revizyon (In-place Revision)**: Herhangi bir metin kutusundaki metni kısayol tuşuyla doğrudan yerinde geliştirebilirsiniz. Sonuç **akışlı (streaming)** yazılır — metin üretildikçe kutuda belirir.
-- **Geri Alma (Undo)**: Yerinde revizyon kutudaki metni ezdiyse `Ctrl + Shift + U` veya sağ tık menüsündeki **"Son revizyonu geri al"** ile orijinal metni geri getirin.
-- **Geliştirme Modları**: Standart meta-prompt'a ek olarak **Vibe Coding** (6 strateji), **Web Araştırma** (Boolean/dorking/akademik/OSINT) ve **Anti-Halüsinasyon** (RAG, ReAct, CoN, CoK, LogiCoT, CoVe, Atomik İddia Doğrulama, Öz-Tutarlılık, Semantik Triangülasyon) modları; "Auto" seçiminde strateji metindeki niyete göre otomatik belirlenir.
-- **Akıllı Görev Algılama**: Ham metin kodlama / analiz / e-posta / özet / çeviri / açıklama / planlama / yaratıcı yazım olarak sınıflandırılır ve prompt buna göre uzmanlaştırılır.
-- **SNN "Ana Beyin" Simülasyonu**: Her revizyondan önce biyofiziksel bir spiking neural network çalışır; ACh/NE/DA nöromodülatör seviyeleri prompt'a bilişsel stil parametresi olarak işlenir ve kullanım geri bildirimiyle (ödül/ceza) zamanla uyarlanır.
-- **Çoklu Sağlayıcı Desteği (Anthropic & OpenRouter)**:
-  - Doğrudan Anthropic Messages API (Claude Sonnet, Haiku, Opus vb.).
-  - OpenRouter API aracılığıyla yüzlerce açık kaynaklı ve ticari model desteği.
-- **Akıllı Hata Yönetimi ve Failover**:
-  - Bir model meşgul olduğunda veya hata verdiğinde, sıradaki alternatif modele otomatik geçiş (sağlayıcılar arası dahil).
-  - 401/403 gibi kritik yetkilendirme hatalarında gereksiz denemeleri durdurma; 90 sn istek / 30 sn akış-sessizlik zaman aşımları.
-- **Hızlı Kısayollar**:
-  - `Ctrl + Shift + L` (Mac: `Cmd + Shift + L`) — anında yerinde revizyon.
-  - `Ctrl + Shift + U` (Mac: `Cmd + Shift + U`) — son revizyonu geri al.
-- **Çıktı Kontrolü**: Çıktı dili (Otomatik/Türkçe/İngilizce) ve dört kademeli uzunluk (Kısa/Orta/Uzun/Maks) seçimi.
-- **Revizyon Geçmişi**: Son 5 revizyon şifrelenerek yerel olarak saklanır; tek tek silinebilir veya tümü temizlenebilir. API anahtarları/e-postalar geçmişe kaydedilmeden ayıklanır.
-- **Güvenli Depolama**: API anahtarlarınız ve tercihleriniz tamamen yerel tarayıcı depolama alanında (`chrome.storage.local`) saklanır; üçüncü taraf sunuculara gönderilmez.
+This project is a modern Google Chrome extension (Manifest V3) that revises ordinary text found in web-page text fields (input/textarea) in place, turning it into **expert-grade prompts (meta-prompts)** by leveraging Claude (the Anthropic Messages API) or OpenRouter integration.
 
 ---
 
-## 📂 Proje Yapısı
+## ✨ Features
+
+- **In-place Revision**: Improve the text in any text field directly in place with a keyboard shortcut. The result is written in a **streaming** fashion — it appears in the field as it is generated.
+- **Undo**: If the in-place revision has overwritten the text in the field, restore the original text with `Ctrl + Shift + U` or the **"Undo last revision"** item in the right-click menu.
+- **Enhancement Modes**: In addition to the standard meta-prompt, there are **Vibe Coding** (6 strategies), **Web Research** (Boolean/dorking/academic/OSINT), and **Anti-Hallucination** (RAG, ReAct, CoN, CoK, LogiCoT, CoVe, Atomic Claim Verification, Self-Consistency, Semantic Triangulation) modes; with the "Auto" selection, the strategy is determined automatically based on the intent in the text.
+- **Smart Task Detection**: The raw text is classified as coding / analysis / email / summary / translation / explanation / planning / creative writing, and the prompt is specialized accordingly.
+- **SNN "Ana Beyin" (Main Brain) Simulation**: A biophysical spiking neural network runs before every revision; the ACh/NE/DA neuromodulator levels are folded into the prompt as a cognitive-style parameter and adapt over time through usage feedback (reward/penalty).
+- **Multi-Provider Support (Anthropic & OpenRouter)**:
+  - Direct Anthropic Messages API (Claude Sonnet, Haiku, Opus, etc.).
+  - Support for hundreds of open-source and commercial models via the OpenRouter API.
+- **Smart Error Handling and Failover**:
+  - When a model is busy or returns an error, automatic switching to the next alternative model (including across providers).
+  - Halting needless retries on critical authorization errors such as 401/403; 90 s request / 30 s stream-silence timeouts.
+- **Quick Shortcuts**:
+  - `Ctrl + Shift + L` (Mac: `Cmd + Shift + L`) — instant in-place revision.
+  - `Ctrl + Shift + U` (Mac: `Cmd + Shift + U`) — undo the last revision.
+- **Output Control**: Choice of output language (Auto/Turkish/English) and four length tiers (Short/Medium/Long/Max).
+- **Revision History**: The last 5 revisions are stored locally in encrypted form; they can be deleted individually or cleared all at once. API keys/emails are stripped out before being saved to history.
+- **Secure Storage**: Your API keys and preferences are stored entirely in local browser storage (`chrome.storage.local`); they are not sent to any third-party servers.
+
+---
+
+## 📂 Project Structure
 
 ```text
-├── manifest.json          # Chrome Uzantısı yapılandırma dosyası (V3)
-├── icons/                 # Uzantı ikonları (SVG kaynağı + 16/32/48/128 PNG)
-├── background.js          # Arka plan işçisi (Service Worker), kısayol ve menü dinleyicileri
-├── content.js             # Sayfalardaki metin alanlarına erişim sağlayan betik
-├── api.js                 # Anthropic ve OpenRouter API entegrasyonları
-├── config.js              # Sağlayıcı tanımları ve yerel ayar yönetim yardımcıları
-├── popup.html / popup.js  # Hızlı erişim ve durum ekranı arayüzü
-├── options.html / options.js # Detaylı model ve API anahtarı ayarları sayfası
-├── prompt.js              # Revizyon sistem prompt'ları ve şablonları
-├── brain_network.js       # Gelişmiş prompt optimizasyon ağı mantığı
-├── brain_helper.js        # Yardımcı fonksiyonlar
-├── verify_brain.js        # SNN doğrulama ve test aracı
-├── verify_prompt.js       # Prompt katmanı doğrulama aracı (node verify_prompt.js)
-├── compliance.md          # Uumluluk ve standartlar belgesi
-├── methodology.md         # Prompt revizyon metodolojisi
-└── performance_report.md  # Performans analiz raporu
+├── manifest.json          # Chrome Extension configuration file (V3)
+├── icons/                 # Extension icons (SVG source + 16/32/48/128 PNG)
+├── background.js          # Background worker (Service Worker), shortcut and menu listeners
+├── content.js             # Script that provides access to text fields on pages
+├── api.js                 # Anthropic and OpenRouter API integrations
+├── config.js              # Provider definitions and local settings management helpers
+├── popup.html / popup.js  # Quick-access and status display interface
+├── options.html / options.js # Detailed model and API key settings page
+├── prompt.js              # Revision system prompts and templates
+├── brain_network.js       # Advanced prompt optimization network logic
+├── brain_helper.js        # Helper functions
+├── verify_brain.js        # SNN validation and testing tool
+├── verify_prompt.js       # Prompt layer validation tool (node verify_prompt.js)
+├── compliance.md          # Compliance and standards document
+├── methodology.md         # Prompt revision methodology
+└── performance_report.md  # Performance analysis report
 ```
 
 ---
 
-## 🛠️ Kurulum ve Yükleme
+## 🛠️ Installation and Loading
 
-Uzantıyı yerel olarak tarayıcınıza yüklemek için şu adımları izleyin:
+Follow these steps to load the extension into your browser locally:
 
-1. Bu depoyu klonlayın veya indirin.
-2. Google Chrome tarayıcınızı açın ve `chrome://extensions/` adresine gidin.
-3. Sağ üst köşede bulunan **"Geliştirici modu" (Developer mode)** seçeneğini aktif hale getirin.
-4. Sol üstteki **"Paketlenmemiş uzantı yükle" (Load unpacked)** butonuna tıklayın.
-5. Bu projenin klasörünü (dosyaların bulunduğu ana dizini) seçerek yükleyin.
+1. Clone or download this repository.
+2. Open your Google Chrome browser and navigate to `chrome://extensions/`.
+3. Enable the **"Developer mode"** option in the top-right corner.
+4. Click the **"Load unpacked"** button in the top left.
+5. Select this project's folder (the root directory containing the files) to load it.
 
 ---
 
-## ⚙️ Yapılandırma ve Kullanım
+## ⚙️ Configuration and Usage
 
-1. Tarayıcınızın uzantı barından **Meta-Prompt** simgesine tıklayın veya **Seçenekler (Options)** sayfasına gidin.
-2. Tercih ettiğiniz sağlayıcıyı (Anthropic ya da OpenRouter) seçin.
-3. API anahtarınızı (API Key) girin ve kullanmak istediğiniz modelleri yapılandırın.
-4. Herhangi bir web sayfasındaki yazı alanına metninizi yazdıktan sonra:
-   - Metni seçip sağ tıklayarak **"Meta-Prompt ile Revize Et"** seçeneğini seçebilir veya
-   - `Ctrl + Shift + L` (`Cmd + Shift + L`) kısayolunu kullanabilirsiniz.
-5. Sonuç beklediğiniz gibi değilse `Ctrl + Shift + U` (`Cmd + Shift + U`) ile orijinal metni geri getirebilirsiniz.
+1. Click the **Meta-Prompt** icon in your browser's extension bar, or go to the **Options** page.
+2. Select your preferred provider (Anthropic or OpenRouter).
+3. Enter your API Key and configure the models you want to use.
+4. After typing your text into a text field on any web page:
+   - Select the text and right-click to choose the **"Revise with Meta-Prompt"** option, or
+   - Use the `Ctrl + Shift + L` (`Cmd + Shift + L`) shortcut.
+5. If the result is not what you expected, you can restore the original text with `Ctrl + Shift + U` (`Cmd + Shift + U`).

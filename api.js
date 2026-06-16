@@ -1,12 +1,12 @@
-// Iki saglayici icin revizyon istemcisi:
-//  - Anthropic Messages API (x-api-key, system ayri alan, content blok dizisi)
-//  - OpenRouter Chat Completions API (Bearer, system bir mesaj, choices[].message)
+// Revision client for the two providers:
+//  - Anthropic Messages API (x-api-key, separate system field, content block array)
+//  - OpenRouter Chat Completions API (Bearer, system as a message, choices[].message)
 
 const ANTHROPIC_URL = "https://api.anthropic.com/v1/messages";
 const OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions";
 const ANTHROPIC_VERSION = "2023-06-01";
 
-// OpenRouter/upstream hatalari ic ice JSON olabilir; okunakli tek satira indir.
+// OpenRouter/upstream errors can be nested JSON; collapse to a readable single line.
 function parseErrorMessage(detail) {
   if (!detail) return "";
   try {
@@ -18,7 +18,7 @@ function parseErrorMessage(detail) {
       try {
         const r = JSON.parse(raw);
         inner = (r.error && r.error.message) || raw;
-      } catch (_) { /* raw duz metin olabilir */ }
+      } catch (_) { /* raw may be plain text */ }
       if (inner && !msg.includes(inner)) msg += ` — ${inner}`;
     }
     return msg;
@@ -27,7 +27,7 @@ function parseErrorMessage(detail) {
   }
 }
 
-// Asili kalan istek rozeti "…" durumunda birakmasin diye ust sinir.
+// Upper bound so a hung request doesn't leave the badge stuck on "…".
 const REQUEST_TIMEOUT_MS = 90000;
 
 async function postJson(url, headers, body) {
@@ -43,15 +43,15 @@ async function postJson(url, headers, body) {
     });
   } catch (networkError) {
     if (networkError.name === "AbortError") {
-      throw new Error(`Istek zaman asimina ugradi (${REQUEST_TIMEOUT_MS / 1000} sn).`);
+      throw new Error(`Request timed out (${REQUEST_TIMEOUT_MS / 1000} s).`);
     }
-    throw new Error(`Aga baglanilamadi: ${networkError.message}`);
+    throw new Error(`Could not connect to the network: ${networkError.message}`);
   } finally {
     clearTimeout(timer);
   }
   if (!res.ok) {
     const detail = await res.text().catch(() => "");
-    throw new Error(`API hatasi ${res.status}: ${parseErrorMessage(detail) || res.statusText}`);
+    throw new Error(`API error ${res.status}: ${parseErrorMessage(detail) || res.statusText}`);
   }
   return res.json();
 }
@@ -77,7 +77,7 @@ async function reviseAnthropic({ apiKey, model, system, userText, maxTokens }) {
     .map((block) => block.text)
     .join("")
     .trim();
-  if (!text) throw new Error("Modelden bos yanit dondu.");
+  if (!text) throw new Error("The model returned an empty response.");
   return text;
 }
 
@@ -100,7 +100,7 @@ async function reviseOpenRouter({ apiKey, model, system, userText, maxTokens }) 
     }
   );
   const text = (data.choices?.[0]?.message?.content || "").trim();
-  if (!text) throw new Error("Modelden bos yanit dondu.");
+  if (!text) throw new Error("The model returned an empty response.");
   return text;
 }
 
@@ -111,17 +111,17 @@ function isFreeModel(m) {
   return Number(p.prompt) === 0 && Number(p.completion) === 0;
 }
 
-// OpenRouter model listesini ceker. tier: "free" | "paid" | "all".
-// Liste herkese acik oldugundan API anahtari gerekmez.
+// Fetches the OpenRouter model list. tier: "free" | "paid" | "all".
+// The list is public, so no API key is required.
 export async function fetchOpenRouterModels(tier = "all") {
   let res;
   try {
     res = await fetch(OPENROUTER_MODELS_URL);
   } catch (networkError) {
-    throw new Error(`Model listesi alinamadi: ${networkError.message}`);
+    throw new Error(`Could not fetch the model list: ${networkError.message}`);
   }
   if (!res.ok) {
-    throw new Error(`Model listesi hatasi ${res.status}`);
+    throw new Error(`Model list error ${res.status}`);
   }
   const json = await res.json();
   let items = (json.data || []).map((m) => ({
@@ -149,7 +149,7 @@ export function detectProvider(model, defaultProvider = "anthropic") {
 export async function revise({ provider, apiKey, apiKeys, model, system, userText, maxTokens = 2048 }) {
   const modelClean = (model || "").trim();
   if (!modelClean) {
-    throw new Error("Model secilmemis. Ayarlar ekranindan bir model secin.");
+    throw new Error("No model selected. Choose a model in the Settings screen.");
   }
   const detectedProv = detectProvider(modelClean, provider);
   
@@ -161,7 +161,7 @@ export async function revise({ provider, apiKey, apiKeys, model, system, userTex
   }
   
   if (!activeKey) {
-    throw new Error(`API anahtari ayarlanmamis (${detectedProv === "openrouter" ? "OpenRouter" : "Anthropic"}). Once Ayarlar ekranindan anahtarinizi girin.`);
+    throw new Error(`API key not set (${detectedProv === "openrouter" ? "OpenRouter" : "Anthropic"}). Enter your key in the Settings screen first.`);
   }
   
   const params = { apiKey: activeKey, model: modelClean, system, userText, maxTokens };
@@ -170,12 +170,12 @@ export async function revise({ provider, apiKey, apiKeys, model, system, userTex
 
 // ============================================================================
 // STREAMING (SSE)
-// Popup'taki revizyonun sonucu uretildikce gosterebilmesi icin. Her iki
-// saglayici da Server-Sent Events formatinda akis destekler; satir formatlari
-// farklidir (Anthropic: content_block_delta, OpenRouter: OpenAI-style delta).
+// So the popup can show the revision result as it is generated. Both
+// providers support streaming in Server-Sent Events format; the line formats
+// differ (Anthropic: content_block_delta, OpenRouter: OpenAI-style delta).
 // ============================================================================
 
-// Akista paketler arasi sessizlik bu sureyi asarsa istek iptal edilir.
+// If the silence between packets in the stream exceeds this duration, the request is aborted.
 const STREAM_IDLE_TIMEOUT_MS = 30000;
 
 async function streamSSE(url, headers, body, onData) {
@@ -197,14 +197,14 @@ async function streamSSE(url, headers, body, onData) {
   } catch (networkError) {
     clearTimeout(idleTimer);
     if (networkError.name === "AbortError") {
-      throw new Error(`Akis zaman asimina ugradi (${STREAM_IDLE_TIMEOUT_MS / 1000} sn sessizlik).`);
+      throw new Error(`Stream timed out (${STREAM_IDLE_TIMEOUT_MS / 1000} s of silence).`);
     }
-    throw new Error(`Aga baglanilamadi: ${networkError.message}`);
+    throw new Error(`Could not connect to the network: ${networkError.message}`);
   }
   if (!res.ok) {
     clearTimeout(idleTimer);
     const detail = await res.text().catch(() => "");
-    throw new Error(`API hatasi ${res.status}: ${parseErrorMessage(detail) || res.statusText}`);
+    throw new Error(`API error ${res.status}: ${parseErrorMessage(detail) || res.statusText}`);
   }
 
   const reader = res.body.getReader();
@@ -217,7 +217,7 @@ async function streamSSE(url, headers, body, onData) {
       resetIdle();
       buffer += decoder.decode(value, { stream: true });
       const lines = buffer.split("\n");
-      buffer = lines.pop(); // son parca eksik olabilir, sonraki tura sakla
+      buffer = lines.pop(); // the last chunk may be incomplete; keep it for the next round
       for (const line of lines) {
         const trimmed = line.trim();
         if (!trimmed.startsWith("data:")) continue;
@@ -230,7 +230,7 @@ async function streamSSE(url, headers, body, onData) {
     }
   } catch (streamError) {
     if (streamError.name === "AbortError") {
-      throw new Error(`Akis zaman asimina ugradi (${STREAM_IDLE_TIMEOUT_MS / 1000} sn sessizlik).`);
+      throw new Error(`Stream timed out (${STREAM_IDLE_TIMEOUT_MS / 1000} s of silence).`);
     }
     throw streamError;
   } finally {
@@ -260,12 +260,12 @@ async function reviseAnthropicStream({ apiKey, model, system, userText, maxToken
         text += json.delta.text;
         onDelta(json.delta.text);
       } else if (json.type === "error") {
-        throw new Error(`API hatasi: ${(json.error && json.error.message) || "bilinmeyen akis hatasi"}`);
+        throw new Error(`API error: ${(json.error && json.error.message) || "unknown stream error"}`);
       }
     }
   );
   const result = text.trim();
-  if (!result) throw new Error("Modelden bos yanit dondu.");
+  if (!result) throw new Error("The model returned an empty response.");
   return result;
 }
 
@@ -297,17 +297,17 @@ async function reviseOpenRouterStream({ apiKey, model, system, userText, maxToke
     }
   );
   const result = text.trim();
-  if (!result) throw new Error("Modelden bos yanit dondu.");
+  if (!result) throw new Error("The model returned an empty response.");
   return result;
 }
 
-// Akisli failover: model basarisiz olursa (henuz hic metin uretmemisken)
-// sonraki modele gecer. Akis basladiktan sonra hata olursa yarim cikti
-// gosterilmis olacagindan failover yapilmaz, hata yukari atilir.
+// Streaming failover: if a model fails (while no text has been produced yet),
+// move to the next model. If an error happens after the stream has started,
+// partial output will already be shown, so no failover is done and the error is rethrown.
 export async function reviseStreamWithFailover({ provider, apiKey, apiKeys, models, system, userText, maxTokens = 2048, onDelta = () => {} }) {
   const list = (models || []).filter(Boolean);
   if (list.length === 0) {
-    throw new Error("Denenecek model yok. Ayarlar'dan bir model secin.");
+    throw new Error("No models to try. Choose a model in Settings.");
   }
 
   let lastError = null;
@@ -331,24 +331,24 @@ export async function reviseStreamWithFailover({ provider, apiKey, apiKeys, mode
       return { result, usedModel: modelClean, fellBack: i > 0, triedCount: i + 1 };
     } catch (error) {
       lastError = error;
-      if (started) throw error;            // yarim cikti var: sessiz failover yapma
-      if (isFatalError(error.message)) break; // anahtar hatasi: denemeyi birak
+      if (started) throw error;            // partial output exists: do not silently fail over
+      if (isFatalError(error.message)) break; // key error: stop trying
     }
   }
-  throw new Error(`Tum modeller basarisiz oldu. Son hata: ${lastError ? lastError.message : "bilinmiyor"}`);
+  throw new Error(`All models failed. Last error: ${lastError ? lastError.message : "unknown"}`);
 }
 
-// Auth/yetki hatalarinda butun modeller basarisiz olacagindan failover anlamsiz.
+// On auth/permission errors all models will fail, so failover is pointless.
 function isFatalError(message) {
   return /\b401\b/.test(message) || /\b403\b/.test(message);
 }
 
-// Model listesini sirayla dener; bir model mesgul/hatali ise (429, 5xx, 400/404
-// model hatasi) bir sonrakine gecer. Ilk basarili yaniti dondurur.
+// Tries the model list in order; if a model is busy/failing (429, 5xx, 400/404
+// model error) it moves to the next. Returns the first successful response.
 export async function reviseWithFailover({ provider, apiKey, apiKeys, models, system, userText, maxTokens = 2048 }) {
   const list = (models || []).filter(Boolean);
   if (list.length === 0) {
-    throw new Error("Denenecek model yok. Ayarlar'dan bir model secin.");
+    throw new Error("No models to try. Choose a model in Settings.");
   }
 
   let lastError = null;
@@ -358,8 +358,8 @@ export async function reviseWithFailover({ provider, apiKey, apiKeys, models, sy
       return { result, usedModel: list[i], fellBack: i > 0, triedCount: i + 1 };
     } catch (error) {
       lastError = error;
-      if (isFatalError(error.message)) break; // anahtar hatasi: denemeyi birak
+      if (isFatalError(error.message)) break; // key error: stop trying
     }
   }
-  throw new Error(`Tum modeller basarisiz oldu. Son hata: ${lastError ? lastError.message : "bilinmiyor"}`);
+  throw new Error(`All models failed. Last error: ${lastError ? lastError.message : "unknown"}`);
 }

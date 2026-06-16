@@ -1,6 +1,6 @@
-// Sag tik menulerini kurar.
-//  - "popup'a gonder": secili metni popup'in okuyacagi yere kaydeder.
-//  - "yerinde revize": aktif metin kutusunu okur, API ile revize eder ve geri yazar.
+// Sets up the right-click context menus.
+//  - "send to popup": stores the selected text where the popup will read it.
+//  - "revise in place": reads the active text box, revises it via the API, and writes it back.
 
 import { reviseWithFailover, reviseStreamWithFailover } from "./api.js";
 import { getFailoverConfig } from "./config.js";
@@ -12,21 +12,21 @@ const MENU_INPLACE = "revizeInPlace";
 const MENU_UNDO = "revizeUndo";
 
 chrome.runtime.onInstalled.addListener(() => {
-  // Mevcut menüleri temizle (duplicate id hatasını engeller).
+  // Clear existing menus (prevents duplicate id errors).
   chrome.contextMenus.removeAll(() => {
     chrome.contextMenus.create({
       id: MENU_TO_POPUP,
-      title: "Metni Meta-Prompt Motoruna gonder (popup)",
+      title: "Send text to Meta-Prompt Engine (popup)",
       contexts: ["selection"]
     });
     chrome.contextMenus.create({
       id: MENU_INPLACE,
-      title: "Bu kutuyu Meta-Prompt ile revize et (yerine yaz)",
+      title: "Revise this box with Meta-Prompt (write in place)",
       contexts: ["editable", "selection"]
     });
     chrome.contextMenus.create({
       id: MENU_UNDO,
-      title: "Son revizyonu geri al",
+      title: "Undo last revision",
       contexts: ["editable"]
     });
   });
@@ -47,7 +47,7 @@ chrome.contextMenus.onClicked.addListener((info, tab) => {
   }
 });
 
-// Klavye kisayollari (varsayilan: revize Ctrl/Cmd+Shift+L, geri al Ctrl/Cmd+Shift+U).
+// Keyboard shortcuts (default: revise Ctrl/Cmd+Shift+L, undo Ctrl/Cmd+Shift+U).
 chrome.commands.onCommand.addListener(async (command, tab) => {
   if (command !== "revise-in-place" && command !== "undo-revise") return;
   let target = tab;
@@ -60,27 +60,27 @@ chrome.commands.onCommand.addListener(async (command, tab) => {
   else undoInPlace(target);
 });
 
-// Son yerinde revizyonu geri alir; orijinal metin content script'te saklanir.
+// Undoes the last in-place revision; the original text is kept in the content script.
 async function undoInPlace(tab) {
   if (!tab || tab.id == null) return;
   const tabId = tab.id;
   const restored = await sendToTab(tabId, { type: "RESTORE_EDITABLE_TEXT" });
   if (restored && restored.ok) {
     setBadge(tabId, "↩", "#5f6368");
-    // Geri alma, sonucun begenilmedigi sinyali: negatif odul uygula.
+    // An undo signals the result was disliked: apply a negative reward.
     try {
       const { rewardBrain } = await import("./brain_helper.js");
       await rewardBrain(-1.0);
     } catch (_) {}
   } else {
     setBadge(tabId, "?", "#d93025");
-    chrome.storage.local.set({ lastError: "Geri alinacak revizyon yok (ayni sayfada bir revizyon yapilmis olmali)." });
+    chrome.storage.local.set({ lastError: "No revision to undo (a revision must have been made on the same page)." });
   }
   clearBadgeLater(tabId);
 }
 
-// content script'e mesaj gonderir; hata olursa null doner (sayfa enjekte
-// edilememis olabilir).
+// Sends a message to the content script; returns null on error (the page may
+// not have been injected).
 function sendToTab(tabId, message) {
   return new Promise((resolve) => {
     chrome.tabs.sendMessage(tabId, message, (response) => {
@@ -99,16 +99,16 @@ function clearBadgeLater(tabId, ms = 4000) {
   setTimeout(() => chrome.action.setBadgeText({ text: "", tabId }), ms);
 }
 
-// Capraz-model konsensus denetimi: uretilen promptu, ureten modelden FARKLI
-// bir modele hakem olarak denetletir. consensusCheck kapali ise null doner.
-// Hata/eksik alternatif model durumlari "skipped" olarak raporlanir — ana
-// akisi asla bozmaz.
+// Cross-model consensus check: has a model DIFFERENT from the producing model
+// review the generated prompt as a judge. Returns null if consensusCheck is off.
+// Errors / missing alternative model cases are reported as "skipped" — they
+// never break the main flow.
 async function runConsensusCheck({ provider, apiKeys, models, usedModel, rawText, result }) {
   try {
     const { consensusCheck } = await chrome.storage.local.get("consensusCheck");
     if (!consensusCheck) return null;
     const judgeModels = (models || []).filter((m) => m !== usedModel);
-    if (!judgeModels.length) return { status: "skipped", reason: "Hakemlik için farklı model yok" };
+    if (!judgeModels.length) return { status: "skipped", reason: "No different model available to judge" };
     const { system, userText } = buildConsensusJudgeMessages(rawText, result);
     const { result: verdictRaw, usedModel: judgeModel } = await reviseWithFailover({
       provider,
@@ -134,28 +134,28 @@ async function reviseInPlace(tab, selectionText = "") {
   try {
     setBadge(tabId, "…", "#1a73e8");
 
-    // 1) Metni al: once aktif kutu, yoksa secili metin.
+    // 1) Get the text: active box first, otherwise the selected text.
     const got = await sendToTab(tabId, { type: "GET_EDITABLE_TEXT" });
     let text = (got && got.text) || selectionText || "";
     text = text.trim();
     if (!text) {
       setBadge(tabId, "?", "#d93025");
-      chrome.storage.local.set({ lastError: "Revize edilecek metin bulunamadi (kutuya yazip tekrar deneyin)." });
+      chrome.storage.local.set({ lastError: "No text found to revise (type into the box and try again)." });
       clearBadgeLater(tabId);
       return;
     }
 
-    // 2) Yapilandirma (aktif model + capraz saglayici yedek listesi).
+    // 2) Configuration (active model + cross-provider backup list).
     const { provider, apiKey, apiKeys, models } = await getFailoverConfig();
     if (!apiKey) {
       setBadge(tabId, "key", "#d93025");
-      chrome.storage.local.set({ lastError: "API anahtari yok. Ayarlar'dan girin." });
+      chrome.storage.local.set({ lastError: "No API key. Enter one in Settings." });
       clearBadgeLater(tabId);
       return;
     }
 
-    // Popup'ta secilen dil/uzunluk/Gelistirme Modu tercihleri (yoksa varsayilan).
-    // Boylece kisayol/sag-tik yolu da popup ile ayni modu kullanir.
+    // Language/length/Development Mode preferences selected in the popup (default if absent).
+    // This way the shortcut/right-click path uses the same mode as the popup.
     const prefs = await chrome.storage.local.get([
       "language", "length", "mode", "vibeStrategy", "researchStrategy", "antihalluStrategy"
     ]);
@@ -181,9 +181,9 @@ async function reviseInPlace(tab, selectionText = "") {
       console.warn("SNN simulation failed, using static fallback:", snnError);
     }
 
-    // 4) Revize et — akisli: sonuc uretildikce kutuya yazilir.
-    // Ara yazimlar ~150ms'de bir TAM birikmis metinle yapilir (fire-and-forget);
-    // ilk basarisiz yazimda akis-yazimi birakilir, sonuc en sonda kopya yoluna duser.
+    // 4) Revise — streaming: the result is written to the box as it is generated.
+    // Intermediate writes happen ~every 150ms with the FULL accumulated text (fire-and-forget);
+    // on the first failed write, stream-writing is abandoned and the result falls back to the copy path at the end.
     let acc = "";
     let lastWriteAt = 0;
     let writeBroken = false;
@@ -210,12 +210,12 @@ async function reviseInPlace(tab, selectionText = "") {
         const now = Date.now();
         if (!writeBroken && now - lastWriteAt >= 150) {
           lastWriteAt = now;
-          streamWrite(acc, false); // beklemeden devam; siralama tab basina FIFO
+          streamWrite(acc, false); // continue without awaiting; ordering is FIFO per tab
         }
       }
     });
 
-    // 5) Son yazim: tam sonuc + done=true (undo durumunu baglar).
+    // 5) Final write: full result + done=true (binds the undo state).
     const wroteOk = !writeBroken && await streamWrite(result, true);
     if (wroteOk) {
       setBadge(tabId, "✓", "#34a853");
@@ -223,35 +223,35 @@ async function reviseInPlace(tab, selectionText = "") {
         const { rewardBrain } = await import("./brain_helper.js");
         await rewardBrain(1.0);
       } catch (_) {}
-      // Istege bagli capraz-model konsensus: hakem sorun bulursa "≠" rozeti
-      // goster ve bulgulari lastError'a yaz (popup'tan okunabilir).
+      // Optional cross-model consensus: if the judge finds issues, show the "≠"
+      // badge and write the findings to lastError (readable from the popup).
       const consensus = await runConsensusCheck({ provider, apiKeys, models, usedModel, rawText: text, result });
       if (consensus && consensus.status === "issues") {
         setBadge(tabId, "≠", "#f9ab00");
-        chrome.storage.local.set({ lastError: `Konsensüs uyarısı (${consensus.judgeModel}):\n${consensus.issues}` });
+        chrome.storage.local.set({ lastError: `Consensus warning (${consensus.judgeModel}):\n${consensus.issues}` });
       }
     } else {
-      // Kutuya yazilamadi: sonucu sakla, popup'tan kopyalanabilir.
+      // Could not write to the box: store the result so it can be copied from the popup.
       chrome.storage.local.set({ selectedText: text, lastInPlaceResult: result });
-      setBadge(tabId, "kopya", "#f9ab00");
+      setBadge(tabId, "copy", "#f9ab00");
     }
   } catch (error) {
     chrome.storage.local.set({ lastError: String((error && error.message) || error) });
-    setBadge(tabId, "hata", "#d93025");
+    setBadge(tabId, "err", "#d93025");
   } finally {
     clearBadgeLater(tabId);
   }
 }
 
-// Arka planda prompt revizyonu gerçekleştiren mesaj dinleyicisi.
+// Message listener that performs prompt revision in the background.
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message.type === "REVISE_PROMPT") {
     handleRevisePromptMessage(message, sendResponse);
-    return true; // asenkron yanit verilecegini belirtir
+    return true; // indicates an async response will be sent
   }
   if (message.type === "REWARD_BRAIN") {
     handleRewardBrainMessage(message, sendResponse);
-    return true; // asenkron yanit verilecegini belirtir
+    return true; // indicates an async response will be sent
   }
 });
 
@@ -266,8 +266,8 @@ async function handleRewardBrainMessage(message, sendResponse) {
   }
 }
 
-// REVISE_PROMPT / akis yolu icin ortak hazirlik: stratejileri coz, SNN'i
-// calistir, saglayici/model plani ve prompt'lari kur.
+// Shared preparation for the REVISE_PROMPT / stream path: resolve strategies,
+// run the SNN, and build the provider/model plan and the prompts.
 async function prepareRevision(message) {
   const { language, length, mode, rawText } = message;
   // Auto-resolve sub-strategies based on raw text intent when "auto" or absent.
@@ -330,9 +330,9 @@ async function handleRevisePromptMessage(message, sendResponse) {
   }
 }
 
-// Akisli revizyon kanali: popup chrome.runtime.connect({name:"revise"}) ile
-// baglanir, sonuc uretildikce "delta" mesajlariyla akar. Port acik kaldigi
-// surece service worker uyumaz.
+// Streaming revision channel: the popup connects via
+// chrome.runtime.connect({name:"revise"}) and the result streams in as "delta"
+// messages while it is produced. The service worker stays awake as long as the port is open.
 chrome.runtime.onConnect.addListener((port) => {
   if (port.name !== "revise") return;
 

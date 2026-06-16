@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="tr">
+<html lang="en">
 <head>
   <meta charset="utf-8">
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -126,7 +126,7 @@
     .mp-seg-btn:hover { color: var(--tx); }
     .mp-seg-btn.on { background: var(--accent-soft); color: var(--accent); font-weight: 600; }
 
-    /* Mod ve strateji aciklama satiri */
+    /* Mode and strategy description row */
     .mp-mode-desc { font-size: 11px; color: var(--dim); line-height: 1.45; }
     .mp-mode-desc:empty { display: none; }
 
@@ -291,7 +291,7 @@
         </div>
         <span class="mp-ver">v2.3</span>
       </div>
-      <button class="mp-icon-btn" id="settingsLink" title="Ayarlar">
+      <button class="mp-icon-btn" id="settingsLink" title="Settings">
         <svg viewBox="0 0 24 24" width="17" height="17" fill="none">
           <circle cx="12" cy="12" r="3.2" stroke="currentColor" stroke-width="1.6"/>
           <path d="M12 2.5v2.2M12 19.3v2.2M21.5 12h-2.2M4.7 12H2.5M18.7 5.3l-1.6 1.6M6.9 17.1l-1.6 1.6M18.7 18.7l-1.6-1.6M6.9 6.9 5.3 5.3"
@@ -306,17 +306,17 @@
 
         <!-- Source text -->
         <div class="mp-row-between">
-          <label class="mp-label" for="rawInput">Kaynak Metin</label>
+          <label class="mp-label" for="rawInput">Source Text</label>
           <span class="mp-pill" id="fromPagePill" style="display:none">
             <svg viewBox="0 0 24 24" fill="none">
               <path d="M9 4.5a1.6 1.6 0 0 1 3.2 0c0 .5.4.9.9.9h2.1a1 1 0 0 1 1 1v2.1c0 .5.4.9.9.9a1.6 1.6 0 0 1 0 3.2c-.5 0-.9.4-.9.9v2.6a1 1 0 0 1-1 1h-2.6c-.5 0-.9-.4-.9-.9a1.6 1.6 0 0 0-3.2 0c0 .5-.4.9-.9.9H6.5a1 1 0 0 1-1-1v-2.6c0-.5-.4-.9-.9-.9a1.6 1.6 0 0 1 0-3.2c.5 0 .9-.4.9-.9V6.4a1 1 0 0 1 1-1h1.6c.5 0 .9-.4.9-.9Z"
                 stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/>
             </svg>
-            sayfadan
+            from page
           </span>
         </div>
         <textarea class="mp-source" id="rawInput" spellcheck="false"
-          placeholder="Bir metin seçin veya buraya yazın…"></textarea>
+          placeholder="Select some text or type here…"></textarea>
 
         <!-- Controls: language + length -->
         <div class="mp-controls">
@@ -327,12 +327,12 @@
                 <path d="M3.6 12h16.8M12 3.6c2.4 2.3 2.4 14.5 0 16.8M12 3.6c-2.4 2.3-2.4 14.5 0 16.8"
                   stroke="currentColor" stroke-width="1.5"/>
               </svg>
-              Çıktı
+              Output
             </label>
             <div class="mp-select-wrap">
               <select class="mp-select" id="langSelect">
-                <option value="auto">Otomatik</option>
-                <option value="tr">Türkçe</option>
+                <option value="auto">Automatic</option>
+                <option value="tr">Turkish</option>
                 <option value="en">English</option>
               </select>
               <span class="mp-select-chev">
@@ -351,20 +351,20 @@
                 <path d="M13 2 4.5 13.5H11l-1 8.5L19.5 10H13l0-8Z"
                   stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/>
               </svg>
-              Uzunluk
+              Length
             </span>
             <div class="mp-seg small" id="lenSeg">
-              <button class="mp-seg-btn" data-val="kisa">Kısa</button>
-              <button class="mp-seg-btn on" data-val="orta">Orta</button>
-              <button class="mp-seg-btn" data-val="uzun">Uzun</button>
-              <button class="mp-seg-btn" data-val="maks">Maks</button>
+              <button class="mp-seg-btn" data-val="kisa">Short</button>
+              <button class="mp-seg-btn on" data-val="orta">Medium</button>
+              <button class="mp-seg-btn" data-val="uzun">Long</button>
+              <button class="mp-seg-btn" data-val="maks">Max</button>
             </div>
             <!-- hidden select synced by popup.js -->
             <select id="lenSelect" style="display:none">
-              <option value="kisa">Kisa</option>
-              <option value="orta" selected>Orta</option>
-              <option value="uzun">Uzun</option>
-              <option value="maks">Maks</option>
+              <option value="kisa">Short</option>
+              <option value="orta" selected>Medium</option>
+              <option value="uzun">Long</option>
+              <option value="maks">Max</option>
             </select>
             <div class="mp-mode-desc" id="lenDesc"></div>
           </div>
@@ -377,19 +377,19 @@
               <svg viewBox="0 0 24 24" fill="none" style="width:12px; height:12px;">
                 <path d="M3.75 13.5l10.5-11.25L12.75 9h7.5L9.75 20.25 11.25 15h-7.5z" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
               </svg>
-              Geliştirme Modu
+              Development Mode
             </span>
             <div class="mp-seg small" id="modeSeg">
-              <button class="mp-seg-btn on" data-val="standard">Standart</button>
-              <button class="mp-seg-btn" data-val="vibecoding">Vibe Coding (Akış Odaklı)</button>
-              <button class="mp-seg-btn" data-val="research">Web Araştırma</button>
-              <button class="mp-seg-btn" data-val="antihallu">Anti-Halüsinasyon</button>
+              <button class="mp-seg-btn on" data-val="standard">Standard</button>
+              <button class="mp-seg-btn" data-val="vibecoding">Vibe Coding (Flow-Focused)</button>
+              <button class="mp-seg-btn" data-val="research">Web Research</button>
+              <button class="mp-seg-btn" data-val="antihallu">Anti-Hallucination</button>
             </div>
             <select id="modeSelect" style="display:none">
-              <option value="standard" selected>Standart</option>
+              <option value="standard" selected>Standard</option>
               <option value="vibecoding">Vibe Coding</option>
-              <option value="research">Web Araştırma</option>
-              <option value="antihallu">Anti-Halüsinasyon</option>
+              <option value="research">Web Research</option>
+              <option value="antihallu">Anti-Hallucination</option>
             </select>
             <div class="mp-mode-desc" id="modeDesc"></div>
           </div>
@@ -402,17 +402,17 @@
               <svg viewBox="0 0 24 24" fill="none" style="width:12px; height:12px;">
                 <path d="M12 3v18M3 12h18M5.6 5.6l12.8 12.8M18.4 5.6L5.6 18.4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
               </svg>
-              Vibe Stratejisi
+              Vibe Strategy
             </span>
             <div class="mp-select-wrap">
               <select class="mp-select" id="vibeStrategySelect">
-                <option value="auto" selected>Auto (Niyete Göre Seç)</option>
-                <option value="standard">Standart Vibe (Hybrid Engineering)</option>
-                <option value="jazz">Caz Doğaçlaması (Jazz Improvisation)</option>
-                <option value="fractal">Fraktal Doğa Mimarisi (Fractal Growth)</option>
-                <option value="emotive">Duygu Durum Filtresi (Emotive Sandbox)</option>
-                <option value="hydrological">Okyanus Akıntısı (Hydrological Flow)</option>
-                <option value="alchemical">Simya ve Element Dönüşümü (Alchemical Refiner)</option>
+                <option value="auto" selected>Auto (Select by Intent)</option>
+                <option value="standard">Standard Vibe (Hybrid Engineering)</option>
+                <option value="jazz">Jazz Improvisation</option>
+                <option value="fractal">Fractal Growth Architecture</option>
+                <option value="emotive">Emotive Sandbox</option>
+                <option value="hydrological">Hydrological Flow</option>
+                <option value="alchemical">Alchemical Refiner</option>
               </select>
               <span class="mp-select-chev">
                 <svg viewBox="0 0 24 24" width="15" height="15" fill="none">
@@ -424,7 +424,7 @@
           </div>
         </div>
 
-        <!-- Research strategy selection (Visible only when Web Araştırma is selected) -->
+        <!-- Research strategy selection (Visible only when Web Research is selected) -->
         <div class="mp-controls" id="researchStrategyControls" style="display: none; margin-top: 10px;">
           <div class="mp-ctrl" style="grid-column: span 2;">
             <span class="mp-label tiny">
@@ -432,17 +432,17 @@
                 <circle cx="11" cy="11" r="7" stroke="currentColor" stroke-width="1.6"/>
                 <path d="M20 20l-3.5-3.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
               </svg>
-              Araştırma Stratejisi
+              Research Strategy
             </span>
             <div class="mp-select-wrap">
               <select class="mp-select" id="researchStrategySelect">
-                <option value="auto" selected>Auto (Niyete Göre Seç)</option>
-                <option value="comprehensive">Kapsamlı (Tüm Teknikler)</option>
-                <option value="web">Web Arama (Boolean + Dorking)</option>
-                <option value="academic">Akademik (Scholar + Atıf)</option>
-                <option value="osint">OSINT (Google Dorking Ağırlıklı)</option>
-                <option value="paywall">Paywall Bypass (Yasal Yollar)</option>
-                <option value="literature">Sistematik Literatür Taraması</option>
+                <option value="auto" selected>Auto (Select by Intent)</option>
+                <option value="comprehensive">Comprehensive (All Techniques)</option>
+                <option value="web">Web Search (Boolean + Dorking)</option>
+                <option value="academic">Academic (Scholar + Citations)</option>
+                <option value="osint">OSINT (Google Dorking Focused)</option>
+                <option value="paywall">Paywall Bypass (Legal Means)</option>
+                <option value="literature">Systematic Literature Review</option>
               </select>
               <span class="mp-select-chev">
                 <svg viewBox="0 0 24 24" width="15" height="15" fill="none">
@@ -454,28 +454,28 @@
           </div>
         </div>
 
-        <!-- Anti-Hallucination strategy selection (Visible only when Anti-Halüsinasyon is selected) -->
+        <!-- Anti-Hallucination strategy selection (Visible only when Anti-Hallucination is selected) -->
         <div class="mp-controls" id="antihalluStrategyControls" style="display: none; margin-top: 10px;">
           <div class="mp-ctrl" style="grid-column: span 2;">
             <span class="mp-label tiny">
               <svg viewBox="0 0 24 24" fill="none" style="width:12px; height:12px;">
                 <path d="M12 2l2.4 4.9 5.4.8-3.9 3.8.9 5.4L12 14.4l-4.8 2.5.9-5.4L4.2 7.7l5.4-.8L12 2z" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/>
               </svg>
-              Anti-Halüsinasyon Tekniği
+              Anti-Hallucination Technique
             </span>
             <div class="mp-select-wrap">
               <select class="mp-select" id="antihalluStrategySelect">
-                <option value="auto" selected>Auto (Niyete Göre Seç)</option>
-                <option value="ensemble">Hepsi (Ensemble — RAG+ReAct+CoN+CoVe)</option>
+                <option value="auto" selected>Auto (Select by Intent)</option>
+                <option value="ensemble">All (Ensemble — RAG+ReAct+CoN+CoVe)</option>
                 <option value="rag">RAG (Retrieval Augmented Generation)</option>
                 <option value="react">ReAct (Reasoning + Acting + Tool Use)</option>
-                <option value="con">Chain-of-Note (Kaynak Filtreleme)</option>
-                <option value="cok">Chain-of-Knowledge (Dinamik Kanıt)</option>
-                <option value="logicot">LogiCoT (Sembolik Mantık Doğrulama)</option>
+                <option value="con">Chain-of-Note (Source Filtering)</option>
+                <option value="cok">Chain-of-Knowledge (Dynamic Evidence)</option>
+                <option value="logicot">LogiCoT (Symbolic Logic Verification)</option>
                 <option value="cove">Chain-of-Verification (Self-Verify)</option>
-                <option value="atomic">Atomik İddia Doğrulama (FActScore + RARR)</option>
-                <option value="selfcheck">Öz-Tutarlılık Denetimi (SelfCheck + CAD)</option>
-                <option value="triangulate">Semantik Triangülasyon (Kod Doğrulama)</option>
+                <option value="atomic">Atomic Claim Verification (FActScore + RARR)</option>
+                <option value="selfcheck">Self-Consistency Check (SelfCheck + CAD)</option>
+                <option value="triangulate">Semantic Triangulation (Code Verification)</option>
               </select>
               <span class="mp-select-chev">
                 <svg viewBox="0 0 24 24" width="15" height="15" fill="none">
@@ -490,7 +490,7 @@
         <!-- Capraz-model konsensus denetimi (istege bagli, ekstra API cagrisi) -->
         <label class="mp-label tiny" id="consensusRow" style="display:flex; align-items:center; gap:6px; margin-top:10px; cursor:pointer;">
           <input type="checkbox" id="consensusCheckToggle" style="margin:0;">
-          <span>Çapraz-Model Konsensüs — sonucu farklı bir modele denetlet (ekstra istek/maliyet)</span>
+          <span>Cross-Model Consensus — have a different model review the result (extra request/cost)</span>
         </label>
 
         <!-- Revise button -->
@@ -499,7 +499,7 @@
             <path d="M12 3v4M12 17v4M3 12h4M17 12h4M5.6 5.6l2.8 2.8M15.6 15.6l2.8 2.8M18.4 5.6l-2.8 2.8M8.4 15.6l-2.8 2.8"
               stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
           </svg>
-          <span class="btn-label">Uzman Prompt'a Revize Et</span>
+          <span class="btn-label">Revise into Expert Prompt</span>
           <span class="mp-spin btn-spin"></span>
           <span class="btn-step"></span>
           <span class="mp-progress" id="reviseProgress" style="width:0%"></span>
@@ -511,8 +511,8 @@
         <!-- Done bar (visible after successful revision) -->
         <div class="mp-done-bar" id="doneBar" style="display:none">
           <span class="mp-done-dot"></span>
-          <span id="doneMsg">Tamamlandı</span>
-          <button class="mp-ghost-mini" id="redoBtn">Yeniden</button>
+          <span id="doneMsg">Done</span>
+          <button class="mp-ghost-mini" id="redoBtn">Redo</button>
         </div>
 
         <!-- Result section (visible after successful revision) -->
@@ -522,7 +522,7 @@
           </div>
           <div class="mp-tabpane">
             <textarea id="output" readonly spellcheck="false"
-              placeholder="Revize edilmiş uzman prompt burada görünecek…"></textarea>
+              placeholder="The revised expert prompt will appear here…"></textarea>
           </div>
           <div class="mp-actions">
             <button class="mp-btn ghost" id="copyBtn">
@@ -531,14 +531,14 @@
                 <path d="M5 15.5A2 2 0 0 1 4 14V6a2 2 0 0 1 2-2h8a2 2 0 0 1 1.5.7"
                   stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
               </svg>
-              <span class="copy-label">Kopyala</span>
+              <span class="copy-label">Copy</span>
             </button>
             <button class="mp-btn accent" id="writePageBtn">
               <svg viewBox="0 0 24 24" width="15" height="15" fill="none">
                 <path d="M4 20h16M5 16.5 15.6 5.9a2 2 0 0 1 2.8 0l-.3-.3a2 2 0 0 1 0 2.8L7.5 19 4 20l1-3.5Z"
                   stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/>
               </svg>
-              <span class="write-label">Sayfaya Yaz</span>
+              <span class="write-label">Write to Page</span>
             </button>
           </div>
         </div>
@@ -551,7 +551,7 @@
               <path d="M12 7.5V12l3 1.8" stroke="currentColor" stroke-width="1.6"
                 stroke-linecap="round" stroke-linejoin="round"/>
             </svg>
-            Son Revizyonlar
+            Recent Revisions
             <span class="mp-recent-n" id="histCount">0</span>
             <span class="mp-recent-chev" id="histChev">
               <svg viewBox="0 0 24 24" width="14" height="14" fill="none">
@@ -561,7 +561,7 @@
             </span>
           </button>
           <ul class="mp-recent-list" id="historyList" style="display:none"></ul>
-          <button class="mp-recent-clear" id="histClearBtn" style="display:none">Tüm geçmişi temizle</button>
+          <button class="mp-recent-clear" id="histClearBtn" style="display:none">Clear all history</button>
           <!-- hidden select kept for storage compat -->
           <select id="historySelect" style="display:none"></select>
         </div>

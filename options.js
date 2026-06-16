@@ -38,13 +38,13 @@ document.addEventListener("DOMContentLoaded", async () => {
     showKeyBtn.addEventListener("click", () => {
       const isPassword = apiKeyInput.type === "password";
       apiKeyInput.type = isPassword ? "text" : "password";
-      showKeyBtn.textContent = isPassword ? "Gizle" : "Göster";
+      showKeyBtn.textContent = isPassword ? "Hide" : "Show";
     });
   }
 
-  // En son yuklenen model listesi (secili katmana gore: ucretsiz/ucretli/tumu).
+  // The most recently loaded model list (by selected tier: free/paid/all).
   let loadedModels = null;
-  // Daha once test edilip "calisiyor" diye dogrulanmis modeller (kalici).
+  // Models previously tested and verified as "working" (persistent).
   let workingModels =
     (await chrome.storage.local.get("openrouterWorkingModels")).openrouterWorkingModels || null;
 
@@ -62,7 +62,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   };
 
   const fillSelect = (items, current) => {
-    const options = ['<option value="">— Ucretsiz modellerden sec —</option>'];
+    const options = ['<option value="">— Pick from free models —</option>'];
     items.forEach((m) => {
       const selected = m.id === current ? " selected" : "";
       options.push(`<option value="${escapeHtml(m.id)}"${selected}>${escapeHtml(m.name)} (${escapeHtml(m.id)})</option>`);
@@ -107,31 +107,31 @@ document.addEventListener("DOMContentLoaded", async () => {
       fillDatalist(orList);
       fillSelect(orList, modelInput.value);
       freeHint.textContent = workingModels
-        ? `${workingModels.length} doğrulanmış çalışan model listede.`
-        : `${loadedModels.length} model listede.`;
+        ? `${workingModels.length} verified working models in the list.`
+        : `${loadedModels.length} models in the list.`;
     } else {
       fillDatalist(meta.modelSuggestions.map((id) => ({ id, name: id })));
       modelSelect.style.display = "none";
     }
   };
 
-  const tierLabel = { free: "ucretsiz", paid: "ucretli", all: "tum" };
+  const tierLabel = { free: "free", paid: "paid", all: "all" };
 
   loadFreeBtn.addEventListener("click", async () => {
     const tier     = tierSelect.value;
     const original = loadFreeBtn.textContent;
     loadFreeBtn.disabled     = true;
-    loadFreeBtn.textContent  = "Yükleniyor…";
+    loadFreeBtn.textContent  = "Loading…";
     freeHint.style.color     = "";
     freeHint.textContent     = "";
     try {
       loadedModels = await fetchOpenRouterModels(tier);
       if (loadedModels.length === 0) {
-        freeHint.textContent = `Şu an ${tierLabel[tier]} model bulunamadı.`;
+        freeHint.textContent = `No ${tierLabel[tier]} models found right now.`;
       } else {
         fillDatalist(loadedModels);
         fillSelect(loadedModels, modelInput.value);
-        freeHint.textContent = `${loadedModels.length} ${tierLabel[tier]} model yüklendi. Aşağıdaki açılır menüden seçin.`;
+        freeHint.textContent = `${loadedModels.length} ${tierLabel[tier]} models loaded. Pick one from the dropdown below.`;
       }
     } catch (error) {
       freeHint.textContent = error.message;
@@ -188,7 +188,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     captureCurrent();
     const apiKey = state.openrouterKey;
     if (!apiKey) {
-      freeHint.textContent   = "Önce OpenRouter API anahtarını girin.";
+      freeHint.textContent   = "Enter your OpenRouter API key first.";
       freeHint.style.color   = "var(--del, #FF8A92)";
       return;
     }
@@ -204,18 +204,18 @@ document.addEventListener("DOMContentLoaded", async () => {
     }
     const total = loadedModels.length;
     if (total === 0) {
-      freeHint.textContent = "Test edilecek model yok.";
+      freeHint.textContent = "No models to test.";
       return;
     }
 
     const hasPaid = loadedModels.some((m) => !m.free);
     if (hasPaid || total > 40) {
-      const onay = confirm(
-        `${total} model test edilecek. ` +
-        (hasPaid ? "Listede ÜCRETLİ modeller var; her test küçük de olsa gerçek ücret yansıtır. " : "") +
-        "Devam edilsin mi?"
+      const confirmed = confirm(
+        `${total} models will be tested. ` +
+        (hasPaid ? "The list contains PAID models; each test incurs a real, if small, charge. " : "") +
+        "Continue?"
       );
-      if (!onay) return;
+      if (!confirmed) return;
     }
 
     verifyBtn.disabled   = true;
@@ -226,8 +226,8 @@ document.addEventListener("DOMContentLoaded", async () => {
     for (let i = 0; i < total; i++) {
       const model      = loadedModels[i];
       freeHint.textContent =
-        `Test ediliyor ${i + 1}/${total} — ${working.length} çalışıyor` +
-        (skipped ? `, ${skipped} atlandı` : "") +
+        `Testing ${i + 1}/${total} — ${working.length} working` +
+        (skipped ? `, ${skipped} skipped` : "") +
         ` | ${model.id}`;
       const result = await probeModel(apiKey, model.id);
       if (result === "ok") working.push(model);
@@ -240,8 +240,8 @@ document.addEventListener("DOMContentLoaded", async () => {
     fillDatalist(working);
     fillSelect(working, modelInput.value);
     freeHint.textContent =
-      `Bitti: ${working.length}/${total} model çalışıyor ve eklendi.` +
-      (skipped ? ` ${skipped} model hız limiti nedeniyle atlandı — tekrar deneyebilirsiniz.` : "");
+      `Done: ${working.length}/${total} models working and added.` +
+      (skipped ? ` ${skipped} models skipped due to rate limits — you can try again.` : "");
 
     verifyBtn.disabled   = false;
     loadFreeBtn.disabled = false;
@@ -254,15 +254,15 @@ document.addEventListener("DOMContentLoaded", async () => {
     const model  = state[meta.modelField] || meta.defaultModel;
 
     if (!apiKey) {
-      testResult.textContent = "Önce API anahtarı girin.";
+      testResult.textContent = "Enter an API key first.";
       testResult.style.color = "var(--del, #FF8A92)";
       return;
     }
 
     const original        = testBtn.textContent;
     testBtn.disabled      = true;
-    testBtn.textContent   = "Test ediliyor…";
-    testResult.textContent = `${state.provider} / ${model} deneniyor…`;
+    testBtn.textContent   = "Testing…";
+    testResult.textContent = `Trying ${state.provider} / ${model}…`;
     testResult.style.color = "";
 
     try {
@@ -274,7 +274,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         userText:  "Reply with the single word OK.",
         maxTokens: 10,
       });
-      testResult.textContent = "✓ Bağlantı başarılı. Anahtar ve model çalışıyor.";
+      testResult.textContent = "✓ Connection successful. Key and model are working.";
       testResult.style.color = "var(--add, #5FE0A0)";
     } catch (error) {
       testResult.textContent = `✗ ${error.message}`;
@@ -290,7 +290,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     const meta = PROVIDERS[state.provider];
 
     if (!state[meta.keyField]) {
-      saved.textContent   = "Lütfen geçerli bir API anahtarı girin.";
+      saved.textContent   = "Please enter a valid API key.";
       saved.style.color   = "var(--del, #FF8A92)";
       return;
     }
@@ -303,7 +303,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       openrouterModel: state.openrouterModel,
     });
 
-    saved.textContent = "Kaydedildi ✓";
+    saved.textContent = "Saved ✓";
     saved.style.color = "var(--add, #5FE0A0)";
     setTimeout(() => { saved.textContent = ""; }, 2000);
   });

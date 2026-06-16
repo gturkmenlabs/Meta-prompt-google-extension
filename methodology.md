@@ -319,5 +319,5 @@ Orchestrator managing sparse connectivity and global neuromodulators.
 | **Tsodyks-Markram STP** | Dynamic neurotransmitter depletion | Short-term memory & sequence tracking | Recreates biological frequency-dependent depression ($\tau_D = 200\text{ ms}$) and facilitation ($\tau_F = 600\text{ ms}$). |
 | **Three-Factor STDP** | Neuromodulated synaptic plasticity | Directed correlation learning (RL) | Modulates learning window width using Acetylcholine and Dopamine eligibility signals. |
 | **Synaptic Scaling** | L1 homeostatic scaling | Weight normalization & scale bounds | Maintains total incoming weight target, keeping network weights stable. |
-| **Synaptic Pruning** | Microglial structural plasticity | Redundancy reduction (budama) | Eliminates inactive or weak connections ($P_r \ge 0.85$ target density drop). |
+| **Synaptic Pruning** | Microglial structural plasticity | Redundancy reduction (pruning) | Eliminates inactive or weak connections ($P_r \ge 0.85$ target density drop). |
 | **Fault-Tolerance Hook** | Homeostatic metabolic stabilization | Exception recovery & numeric clamping | Recovers state variables from NaNs/Infinities within a single step execution. |

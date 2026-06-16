@@ -1,21 +1,21 @@
-// Saglayici tanimlari ve aktif yapilandirmayi okuma yardimcilari.
-// Her saglayicinin anahtari ve modeli ayri saklanir; saglayici degistirince
-// digerinin bilgileri kaybolmaz.
+// Provider definitions and helpers for reading the active configuration.
+// Each provider's key and model are stored separately, so switching providers
+// does not wipe the other one's settings.
 
 export const PROVIDERS = {
   anthropic: {
-    label: "Anthropic (dogrudan)",
+    label: "Anthropic (direct)",
     keyField: "anthropicKey",
     modelField: "anthropicModel",
     keyPlaceholder: "sk-ant-...",
     defaultModel: "claude-sonnet-4-6",
-    // Bilinen, sabit model kimlikleri.
+    // Known, fixed model IDs.
     modelSuggestions: [
       "claude-haiku-4-5-20251001",
       "claude-sonnet-4-6",
       "claude-opus-4-8"
     ],
-    modelHint: "Anthropic model kimligi (orn. claude-sonnet-4-6)."
+    modelHint: "Anthropic model ID (e.g. claude-sonnet-4-6)."
   },
   openrouter: {
     label: "OpenRouter",
@@ -23,8 +23,8 @@ export const PROVIDERS = {
     modelField: "openrouterModel",
     keyPlaceholder: "sk-or-...",
     defaultModel: "anthropic/claude-sonnet-4.6",
-    // OpenRouter'da yuzlerce model var ve slug'lar degisebilir;
-    // bunlar yalnizca ornek. Guncel liste: https://openrouter.ai/models
+    // OpenRouter has hundreds of models and slugs may change;
+    // these are only examples. Current list: https://openrouter.ai/models
     modelSuggestions: [
       "anthropic/claude-sonnet-4.6",
       "anthropic/claude-opus-4.8",
@@ -32,7 +32,7 @@ export const PROVIDERS = {
       "google/gemini-2.0-flash-001",
       "meta-llama/llama-3.3-70b-instruct"
     ],
-    modelHint: "OpenRouter slug'i (orn. anthropic/claude-sonnet-4.6). Liste: openrouter.ai/models"
+    modelHint: "OpenRouter slug (e.g. anthropic/claude-sonnet-4.6). List: openrouter.ai/models"
   }
 };
 
@@ -49,7 +49,7 @@ export async function getStoredConfig() {
   return { provider: DEFAULT_PROVIDER, ...data };
 }
 
-// Aktif saglayicinin {provider, apiKey, model} bilgisini dondurur.
+// Returns the active provider's {provider, apiKey, model}.
 export async function getActiveConfig() {
   const stored = await getStoredConfig();
   const provider = stored.provider || DEFAULT_PROVIDER;
@@ -61,9 +61,9 @@ export async function getActiveConfig() {
   };
 }
 
-// Failover icin tam plan: aktif model + yedek model listesi + tum anahtarlar.
-// Hem popup (REVISE_PROMPT) hem kisayol/sag-tik (reviseInPlace) yollari bunu
-// kullanir; model listesi mantigi tek yerde kalsin.
+// Full failover plan: active model + backup model list + all keys.
+// Both the popup (REVISE_PROMPT) and the shortcut/right-click (reviseInPlace)
+// paths use this, so the model-list logic stays in one place.
 export async function getFailoverConfig() {
   const stored = await chrome.storage.local.get([...ALL_FIELDS, "openrouterWorkingModels"]);
   const provider = stored.provider || DEFAULT_PROVIDER;
@@ -79,8 +79,8 @@ export async function getFailoverConfig() {
   if (provider === "openrouter") {
     models = [activeModel, ...working.map((m) => m.id).filter((id) => id && id !== activeModel)];
   } else if (apiKeys.openrouter) {
-    // Anthropic aktifken OpenRouter anahtari varsa, dogrulanmis modelleri
-    // capraz yedek olarak ekle (api.js detectProvider dogru anahtari secer).
+    // When Anthropic is active but an OpenRouter key exists, add the verified
+    // models as cross-provider backups (api.js detectProvider picks the right key).
     models = [activeModel, ...working.map((m) => m.id).filter(Boolean)];
   }
 

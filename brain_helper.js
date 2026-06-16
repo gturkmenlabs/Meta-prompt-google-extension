@@ -67,19 +67,19 @@ export async function runBrainSimulation(taskType) {
     for (let i = 1; i <= 10; i++) externalInputs[i] = 2.0;
     for (let i = 11; i <= 20; i++) externalInputs[i] = 110.0;
   } else if (taskType === "translation" || taskType === "summary") {
-    // Sadakat gorevleri: cok yuksek odak, minimum kesif (kaynak metne bagli kal)
+    // Fidelity tasks: very high focus, minimal exploration (stay close to the source text)
     for (let i = 1; i <= 10; i++) externalInputs[i] = 105.0;
     for (let i = 11; i <= 20; i++) externalInputs[i] = 5.0;
   } else if (taskType === "email") {
-    // Ton kalibrasyonu: yuksek odak + hafif kesif (uslup secenekleri)
+    // Tone calibration: high focus + light exploration (style options)
     for (let i = 1; i <= 10; i++) externalInputs[i] = 90.0;
     for (let i = 11; i <= 20; i++) externalInputs[i] = 15.0;
   } else if (taskType === "explain") {
-    // Ogretme: dengeli odak + analoji icin orta kesif
+    // Teaching: balanced focus + moderate exploration for analogies
     for (let i = 1; i <= 10; i++) externalInputs[i] = 70.0;
     for (let i = 11; i <= 20; i++) externalInputs[i] = 45.0;
   } else if (taskType === "planning") {
-    // Planlama: yuksek odak + sistematik akil yurutme (analysis benzeri)
+    // Planning: high focus + systematic reasoning (similar to analysis)
     for (let i = 1; i <= 10; i++) externalInputs[i] = 85.0;
     for (let i = 21; i <= 30; i++) externalInputs[i] = 45.0;
   } else {

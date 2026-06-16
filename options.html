@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="tr">
+<html lang="en">
 <head>
   <meta charset="utf-8">
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -208,7 +208,7 @@
       </span>
       <div>
         <div class="ms-title">MetaPrompt</div>
-        <div class="ms-sub">Ayarlar</div>
+        <div class="ms-sub">Settings</div>
       </div>
     </div>
 
@@ -225,14 +225,14 @@
           </svg>
         </div>
         <div>
-          <div class="ms-hero-t">Bağlantı</div>
-          <div class="ms-hero-s">Anahtarlar yalnızca bu tarayıcıda (chrome.storage.local) saklanır — sunucularımıza gönderilmez.</div>
+          <div class="ms-hero-t">Connection</div>
+          <div class="ms-hero-s">Keys are stored only in this browser (chrome.storage.local) — they are never sent to our servers.</div>
         </div>
       </div>
 
       <!-- Provider -->
       <div class="ms-field">
-        <label class="ms-label">Sağlayıcı</label>
+        <label class="ms-label">Provider</label>
         <!-- Visual segmented buttons (synced with hidden select by options.js) -->
         <div class="ms-seg" id="providerSeg">
           <button class="ms-seg-btn on" data-provider="anthropic">Anthropic</button>
@@ -247,14 +247,14 @@
 
       <!-- API key -->
       <div class="ms-field">
-        <label class="ms-label" for="apiKey">API Anahtarı</label>
+        <label class="ms-label" for="apiKey">API Key</label>
         <div class="ms-input-wrap">
           <input class="ms-input mono" id="apiKey" type="password"
             placeholder="sk-ant-api03-…" autocomplete="off" spellcheck="false">
-          <button class="ms-show-btn" id="showKeyBtn" type="button">Göster</button>
+          <button class="ms-show-btn" id="showKeyBtn" type="button">Show</button>
         </div>
         <div class="ms-hint" style="color:var(--faint); font-size:11px; margin-top:2px;">
-          Düz metin olarak saklanır — paylaşılan bilgisayarlarda dikkatli olun.
+          Stored as plain text — be careful on shared computers.
         </div>
       </div>
 
@@ -263,7 +263,7 @@
         <label class="ms-label" for="model">Model</label>
         <div class="ms-input-wrap" style="padding-right:0">
           <input class="ms-input" id="model" list="modelList"
-            placeholder="model kimliği" autocomplete="off" spellcheck="false"
+            placeholder="model ID" autocomplete="off" spellcheck="false"
             style="padding-right:12px">
           <datalist id="modelList"></datalist>
         </div>
@@ -271,14 +271,14 @@
 
         <!-- OpenRouter extras (shown/hidden by options.js) -->
         <select id="tierSelect">
-          <option value="free">Ücretsiz modeller</option>
-          <option value="paid">Ücretli modeller</option>
-          <option value="all">Tüm modeller</option>
+          <option value="free">Free models</option>
+          <option value="paid">Paid models</option>
+          <option value="all">All models</option>
         </select>
-        <button id="loadFreeBtn" type="button">⬇ OpenRouter modellerini yükle</button>
-        <button id="verifyBtn" type="button">✓ Çalışanları test et ve ekle</button>
+        <button id="loadFreeBtn" type="button">⬇ Load OpenRouter models</button>
+        <button id="verifyBtn" type="button">✓ Test and add working ones</button>
         <select id="modelSelect">
-          <option value="">— Ücretsiz modellerden seç —</option>
+          <option value="">— Select from free models —</option>
         </select>
         <div class="ms-hint" id="freeHint"></div>
       </div>
@@ -292,7 +292,7 @@
             <path d="M5 12h13M12 6l6 6-6 6" stroke="currentColor" stroke-width="1.8"
               stroke-linecap="round" stroke-linejoin="round"/>
           </svg>
-          Bağlantıyı Test Et
+          Test Connection
         </button>
         <div class="ms-hint" id="testResult"></div>
       </div>
@@ -304,7 +304,7 @@
             <path d="M5 12.5l4.2 4.3L19 7" stroke="currentColor" stroke-width="1.9"
               stroke-linecap="round" stroke-linejoin="round"/>
           </svg>
-          Kaydet
+          Save
         </button>
         <div id="saved"></div>
       </div>
