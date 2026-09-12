@@ -11,6 +11,9 @@ const MENU_TO_POPUP = "revizeMetaPrompt";
 const MENU_INPLACE = "revizeInPlace";
 const MENU_UNDO = "revizeUndo";
 const activeRevisions = new Set();
+// How often the in-place stream mirrors its accumulated text into storage, so a
+// service-worker eviction cannot silently discard a revision in progress.
+const PARTIAL_SAVE_MS = 1000;
 const badgeTimers = new Map();
 
 chrome.runtime.onInstalled.addListener(() => {
@@ -139,13 +142,15 @@ async function reviseInPlace(tab, selectionText = "") {
   const tabId = tab.id;
   activeRevisions.add(tabId);
   let writeQueue = Promise.resolve();
+  let text = "";
+  let acc = "";
 
   try {
     setBadge(tabId, "…", "#1a73e8");
 
     // 1) Get the text: active box first, otherwise the selected text.
     const got = await sendToTab(tabId, { type: "GET_EDITABLE_TEXT", captureTarget: true });
-    let text = (got && got.text) || selectionText || "";
+    text = (got && got.text) || selectionText || "";
     text = text.trim();
     if (!text) {
       setBadge(tabId, "?", "#d93025");
@@ -193,9 +198,19 @@ async function reviseInPlace(tab, selectionText = "") {
     // 4) Revise — streaming: the result is written to the box as it is generated.
     // Intermediate writes happen ~every 150ms with the FULL accumulated text (fire-and-forget);
     // on the first failed write, stream-writing is abandoned and the result falls back to the copy path at the end.
-    let acc = "";
     let lastWriteAt = 0;
+    let lastSaveAt = 0;
     let writeBroken = false;
+    let savedPartial = false;
+    // The service worker can be evicted mid-stream — most likely once page writes
+    // stop (writeBroken), because then nothing but the fetch is keeping it busy.
+    // Persisting the text generated so far means an eviction loses nothing: the
+    // popup still finds the partial under lastInPlaceResult and can copy it.
+    const persistPartial = (textSoFar) => {
+      if (!textSoFar) return;
+      savedPartial = true;
+      chrome.storage.local.set({ lastInPlaceResult: textSoFar });
+    };
     const streamWrite = async (chunkText, done) => {
       if (writeBroken) return false;
       const resp = await sendToTab(tabId, { type: "STREAM_EDITABLE_TEXT", text: chunkText, done });
@@ -222,6 +237,10 @@ async function reviseInPlace(tab, selectionText = "") {
           const snapshot = acc;
           writeQueue = writeQueue.then(() => streamWrite(snapshot, false));
         }
+        if (now - lastSaveAt >= PARTIAL_SAVE_MS) {
+          lastSaveAt = now;
+          persistPartial(acc);
+        }
       }
     });
 
@@ -229,6 +248,9 @@ async function reviseInPlace(tab, selectionText = "") {
     await writeQueue;
     const wroteOk = !writeBroken && await streamWrite(result, true);
     if (wroteOk) {
+      // The page holds the result, so drop the crash-recovery copy; otherwise the
+      // popup would keep presenting it as an unwritten in-place result.
+      if (savedPartial) chrome.storage.local.remove("lastInPlaceResult");
       setBadge(tabId, "✓", "#34a853");
       try {
         const { rewardBrain } = await import("./brain_helper.js");
@@ -247,8 +269,14 @@ async function reviseInPlace(tab, selectionText = "") {
       setBadge(tabId, "copy", "#f9ab00");
     }
   } catch (error) {
-    chrome.storage.local.set({ lastError: String((error && error.message) || error) });
-    setBadge(tabId, "err", "#d93025");
+    // Keep whatever was generated before the failure so it is recoverable.
+    const partial = { lastError: String((error && error.message) || error) };
+    if (acc) {
+      partial.selectedText = text;
+      partial.lastInPlaceResult = acc;
+    }
+    chrome.storage.local.set(partial);
+    setBadge(tabId, acc ? "copy" : "err", acc ? "#f9ab00" : "#d93025");
   } finally {
     await writeQueue;
     await sendToTab(tabId, { type: "END_EDITABLE_STREAM" });
