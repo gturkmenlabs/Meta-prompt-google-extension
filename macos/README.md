@@ -41,11 +41,8 @@ engine's failover behavior.
 
 Install Apple's Command Line Tools, then from the project root:
 
-    python3 macos/build.py
-    node macos/verify_desktop.mjs
-    node verify_runtime.mjs
-    node verify_prompt.js
-    node verify_brain.js
+    npm run build:macos
+    npm test
 
 The build copies the shared interface and engine files into the app, adds the
 desktop bridge and layout, compiles the Swift host, and applies a local ad-hoc

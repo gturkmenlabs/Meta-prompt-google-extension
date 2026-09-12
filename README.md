@@ -41,8 +41,10 @@ This project is a modern Google Chrome extension (Manifest V3) that revises ordi
 ├── prompt.js              # Revision system prompts and templates
 ├── brain_network.js       # Advanced prompt optimization network logic
 ├── brain_helper.js        # Helper functions
+├── package.json           # Offline check runner (npm test); no bundler, no build step
 ├── verify_brain.js        # SNN validation and testing tool
-├── verify_prompt.js       # Prompt layer validation tool (node verify_prompt.js)
+├── verify_prompt.js       # Prompt layer validation tool (npm run test:prompt)
+├── verify_runtime.mjs     # Config, failover, streaming and undo contracts
 ├── compliance.md          # Compliance and standards document
 ├── methodology.md         # Prompt revision methodology
 └── performance_report.md  # Performance analysis report
@@ -84,10 +86,13 @@ A stream that ends without its completion marker is reported as incomplete.
 Run the offline checks (no API keys, network requests, or build step required):
 
 ```sh
-node verify_prompt.js
-node verify_brain.js
-node verify_runtime.mjs
+npm test
 ```
+
+That runs the prompt layer (122 structural checks, including Turkish task
+detection), the brain simulation, the runtime contracts, and the macOS desktop
+bridge. Individual suites are available as `npm run test:prompt`, `test:brain`,
+`test:runtime` and `test:desktop`.
 
 After changes, reload the unpacked extension and refresh the target page. For a
 manual smoke test, revise a textarea, switch focus while generation is running,
