@@ -60,7 +60,34 @@ const DETECT_CASES = [
   ["compare two suppliers in terms of advantage and disadvantage", "analysis"],
   ["what is a postal code", "explain"],
   ["hello how are you", "general"],
-  ["", "general"]
+  ["", "general"],
+  // Turkish. The product, its length labels and much of its audience are Turkish,
+  // so the classifier must not fall back to "general" for ordinary Turkish input.
+  ["bu metni ozetle", "summary"],
+  ["bu metni özetle", "summary"],
+  ["bu maili ingilizceye çevir", "translation"],
+  ["patronuma izin maili yaz", "email"],
+  ["bana python ile csv okuyan kod yaz", "coding"],
+  ["kuantum dolanıklığı nedir basitçe açıkla", "explain"],
+  ["3 aylık ürün lansmanı için yol haritası çıkar", "planning"],
+  ["iki tedarikçiyi avantaj ve dezavantaj açısından karşılaştır", "analysis"],
+  ["kahve markası için reklam sloganı ve blog içeriği yaz", "creative"],
+  ["haftalık çalışma programı hazırla", "planning"],
+  ["bir veritabanı sorgusundaki hatayı ayıkla", "coding"],
+  ["makaleyi madde madde özetle", "summary"],
+  ["ÇEVİR bu cümleyi almancaya", "translation"],
+  // Turkish false positives: "kod" inside non-coding compounds must not win.
+  ["posta kodu nedir", "explain"],
+  ["posta kodumu nasıl öğrenirim", "explain"],
+  ["kargo için barkod etiketi", "general"],
+  ["güvenlik kodu gelmedi", "general"],
+  // "programı" is a schedule here, but the English "program" keyword used to
+  // score it as coding and win the tie on priority order.
+  ["haftalık spor programı çıkar", "planning"],
+  ["beslenme programı öner", "planning"],
+  ["bir program yaz python ile", "coding"],
+  ["hikaye anlat bana", "creative"],
+  ["merhaba nasılsın", "general"]
 ];
 for (const [text, want] of DETECT_CASES) {
   const got = detectTaskType(text);

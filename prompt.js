@@ -17,12 +17,27 @@ export function escapeXml(unsafe) {
 }
 
 
+// Turkish users routinely type without diacritics ("ozetle" for "ozetle"), and
+// "I".toLowerCase() leaves a combining dot behind. Folding both the text and the
+// keyword list to plain ASCII lets one keyword cover every spelling.
+export function foldDiacritics(text) {
+  return text
+    .replace(/[\u00e7\u00c7]/g, "c")
+    .replace(/[\u011f\u011e]/g, "g")
+    .replace(/[\u0131\u0130]/g, "i")
+    .replace(/[\u00f6\u00d6]/g, "o")
+    .replace(/[\u015f\u015e]/g, "s")
+    .replace(/[\u00fc\u00dc]/g, "u")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "");
+}
+
 // Classifier that detects the task type from the source text (Selective Attention / Pruning)
 export function detectTaskType(rawText) {
   if (!rawText) return "general";
-  const text = rawText.toLowerCase();
+  const text = foldDiacritics(rawText.toLowerCase());
 
-  // Strip non-coding patterns that contain the word 'code'
+  // Strip non-coding patterns that contain the word 'code' / 'kod'
   const cleanText = text
     .replace(/postal\s+code/g, "")
     .replace(/area\s+code/g, "")
@@ -33,7 +48,24 @@ export function detectTaskType(rawText) {
     .replace(/confirmation\s+code/g, "")
     .replace(/security\s+code/g, "")
     .replace(/qr\s+code/g, "")
-    .replace(/barcode/g, "");
+    .replace(/barcode/g, "")
+    // Turkish compounds built on "kod" that have nothing to do with programming.
+    .replace(/posta\s+kodu/g, "")
+    .replace(/alan\s+kodu/g, "")
+    .replace(/ulke\s+kodu/g, "")
+    .replace(/il\s+kodu/g, "")
+    .replace(/guvenlik\s+kodu/g, "")
+    .replace(/dogrulama\s+kodu/g, "")
+    .replace(/onay\s+kodu/g, "")
+    .replace(/erisim\s+kodu/g, "")
+    .replace(/indirim\s+kodu/g, "")
+    .replace(/kupon\s+kodu/g, "")
+    .replace(/kare\s*kod/g, "")
+    .replace(/barkod/g, "")
+    // "... programi" is a schedule, not software. The English "program" keyword
+    // would otherwise score it as coding and win the tie on priority order, so
+    // rewrite the compound into a planning marker.
+    .replace(/(spor|calisma|antrenman|ders|egitim|beslenme|okuma|haftalik|aylik|gunluk)\s+program\w*/g, " $1 planlama ");
 
   // Score-based classification: count keyword hits per category; the highest
   // scoring category wins. Ties are broken by the order below (specific to
@@ -43,39 +75,64 @@ export function detectTaskType(rawText) {
       "function", "class", "javascript", "python", "html", "css", "api", "database",
       "sql", "git", "bug", "algorithm", "math", "calculate", "equation", "formula", "excel",
       "code", "software", "program", "typescript", "react", "endpoint",
-      "regex", "script", "debug", "compile", "deploy"
+      "regex", "script", "debug", "compile", "deploy",
+      // Turkish (diacritic-folded to match foldDiacritics output)
+      "kod", "yazilim", "fonksiyon", "degisken", "veritabani", "algoritma",
+      "betik", "derle", "hata ayikla", "programla", "sorgu", "denklem", "formul",
+      "hesapla", "uygulama gelistir", "arayuz gelistir"
     ],
     analysis: [
       "analysis", "compare", "evaluate", "decision", "report", "strateg",
       "pros", "cons", "advantage", "disadvantage", "rubric", "criteria", "selection",
-      "assessment", "swot", "analyze"
+      "assessment", "swot", "analyze",
+      // Turkish
+      "analiz", "karsilastir", "degerlendir", "karar ver", "rapor", "strateji",
+      "avantaj", "dezavantaj", "kriter", "olcut", "artilari", "eksileri", "incele"
     ],
     email: [
       "e-mail", "email", "mail", "reply", "dear", "request",
       "politely", "formal language", "petition", "cover letter", "write a message",
-      "follow-up", "reminder email", "correspondence", "contact"
+      "follow-up", "reminder email", "correspondence", "contact",
+      // Turkish
+      "e-posta", "eposta", "mail", "mektup", "dilekce", "nazik", "resmi bir dil",
+      "on yazi", "hatirlatma", "sayin", "rica ed"
     ],
     summary: [
       "summarize", "summary", "tl;dr", "tldr", "shorten",
-      "main idea", "main points", "key points", "condense", "bullet summary"
+      "main idea", "main points", "key points", "condense", "bullet summary",
+      // Turkish
+      "ozet", "kisalt", "ana fikir", "ana nokta", "temel nokta", "madde madde"
     ],
     translation: [
       "translate", "translation", "into english", "into turkish",
-      "from english", "from turkish", "into german", "into french", "localize"
+      "from english", "from turkish", "into german", "into french", "localize",
+      // Turkish
+      "cevir", "tercume", "turkceye", "ingilizceye", "almancaya", "fransizcaya",
+      "turkceden", "ingilizceden", "yerellestir"
     ],
     explain: [
       "explain", "describe", "what is", "what does it mean", "teach",
-      "simply", "what is the difference", "how does it work", "why", "how does", "eli5"
+      "simply", "what is the difference", "how does it work", "why", "how does", "eli5",
+      // Turkish. "anlat" is deliberately absent: it collides with "hikaye anlat".
+      "acikla", "nedir", "ne demek", "ogret", "basitce", "nasil calisir",
+      "izah", "fark nedir", "ogren"
     ],
     planning: [
       "plan", "roadmap", "schedule", "make a program",
       "step-by-step plan", "to-do", "tasks", "milestone", "sprint", "weekly schedule",
-      "study schedule", "training program"
+      "study schedule", "training program",
+      // Turkish
+      "plan", "yol haritasi", "takvim", "adim adim", "yapilacaklar",
+      "gorev listesi", "kilometre tasi", "haftalik", "aylik", "planlama"
     ],
     creative: [
       "story", "poem", "creative", "blog", "content", "ad", "slogan",
       "fiction", "screenplay", "article", "novel", "tale", "song lyrics",
-      "promo", "post", "caption", "tweet"
+      "promo", "post", "caption", "tweet",
+      // Turkish
+      "hikaye", "oyku", "siir", "yaratici", "icerik", "reklam", "slogan",
+      "kurgu", "senaryo", "makale", "roman", "masal", "sarki sozu",
+      "tanitim", "gonderi"
     ]
   };
   // Tie-breaking priority: specific tasks before general ones.
