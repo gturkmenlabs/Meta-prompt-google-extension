@@ -1,5 +1,16 @@
+# OS / editor noise
 .DS_Store
 *.local
+
+# Secrets
 .env
 .env.*
 .trash/
+
+# Build output (regenerate with: python3 macos/build.py)
+dist/
+macos/.build/
+
+# Third-party runtime. Unreferenced by any source file; see README.
+macos/runtime/
+node_modules/

@@ -4,6 +4,7 @@
 
 (() => {
   let lastEditable = null;
+  let revisionTarget = null;
   // State before the last SET_EDITABLE_TEXT; undone via RESTORE_EDITABLE_TEXT.
   let undoState = null; // { el, prevText }
   // Ongoing streaming write: target element and the text BEFORE the stream. The
@@ -12,7 +13,7 @@
   let streamState = null; // { el, prevText }
 
   const isEditable = (el) => {
-    if (!el || el.nodeType !== 1) return false;
+    if (!el || el.nodeType !== 1 || el.disabled || el.readOnly) return false;
     const tag = el.tagName;
     if (tag === "TEXTAREA") return true;
     if (tag === "INPUT") {
@@ -68,7 +69,8 @@
       if (el.isContentEditable) {
         el.innerText = text;
       } else {
-        el.value = text;
+        const prototype = el.tagName === "TEXTAREA" ? HTMLTextAreaElement.prototype : HTMLInputElement.prototype;
+        Object.getOwnPropertyDescriptor(prototype, "value").set.call(el, text);
       }
       el.dispatchEvent(new Event("input", { bubbles: true }));
       el.dispatchEvent(new Event("change", { bubbles: true }));
@@ -78,6 +80,7 @@
   chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
     if (msg.type === "GET_EDITABLE_TEXT") {
       const el = currentTarget();
+      if (msg.captureTarget) revisionTarget = el ? { el, prevText: readText(el) } : null;
       sendResponse({ text: el ? readText(el) : null });
     } else if (msg.type === "SET_EDITABLE_TEXT") {
       const el = currentTarget();
@@ -97,19 +100,26 @@
       // the last message and binds the undo state to the pre-stream text.
       try {
         if (!streamState) {
-          const el = currentTarget();
-          if (!el) {
+          const el = revisionTarget?.el;
+          if (!el || !isEditable(el) || readText(el) !== revisionTarget.prevText) {
             sendResponse({ ok: false });
             return true;
           }
-          streamState = { el, prevText: readText(el) };
+          streamState = { el, prevText: readText(el), lastText: readText(el) };
+          undoState = streamState;
         }
         if (!document.contains(streamState.el)) {
           streamState = null;
           sendResponse({ ok: false, reason: "target-lost" });
           return true;
         }
+        if (!isEditable(streamState.el) || readText(streamState.el) !== streamState.lastText) {
+          streamState = null;
+          sendResponse({ ok: false, reason: "target-edited" });
+          return true;
+        }
         writeText(streamState.el, msg.text);
+        streamState.lastText = readText(streamState.el);
         if (msg.done) {
           undoState = streamState;
           streamState = null;
@@ -119,7 +129,13 @@
         streamState = null;
         sendResponse({ ok: false, error: String(error && error.message) });
       }
+    } else if (msg.type === "END_EDITABLE_STREAM") {
+      streamState = null;
+      revisionTarget = null;
+      sendResponse({ ok: true });
     } else if (msg.type === "RESTORE_EDITABLE_TEXT") {
+      streamState = null;
+      revisionTarget = null;
       if (!undoState || !document.contains(undoState.el)) {
         sendResponse({ ok: false, reason: "no-undo" });
       } else {
@@ -132,6 +148,6 @@
         }
       }
     }
-    return true; // for async sendResponse
+    return false; // All responses above are synchronous.
   });
 })();

@@ -21,7 +21,10 @@ document.addEventListener("DOMContentLoaded", async () => {
   // ——— Provider segmented buttons ———
   const providerBtns = document.querySelectorAll("[data-provider]");
   const syncProviderBtns = (p) => {
-    providerBtns.forEach((b) => b.classList.toggle("on", b.dataset.provider === p));
+    providerBtns.forEach((b) => {
+      b.classList.toggle("on", b.dataset.provider === p);
+      b.setAttribute("aria-pressed", String(b.dataset.provider === p));
+    });
   };
   providerBtns.forEach((btn) => {
     btn.addEventListener("click", () => {
@@ -86,6 +89,8 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   const renderProvider = (provider) => {
     syncProviderBtns(provider);
+    apiKeyInput.type = "password";
+    if (showKeyBtn) showKeyBtn.textContent = "Show";
 
     const meta = PROVIDERS[provider];
     apiKeyInput.value       = state[meta.keyField];
@@ -180,6 +185,7 @@ document.addEventListener("DOMContentLoaded", async () => {
           return /\b429\b/.test(retryError.message) ? "rate" : "fail";
         }
       }
+      if (/\b(401|403)\b/.test(error.message)) throw error;
       return "fail";
     }
   };
@@ -223,6 +229,9 @@ document.addEventListener("DOMContentLoaded", async () => {
     const working = [];
     let skipped   = 0;
 
+    providerBtns.forEach((btn) => { btn.disabled = true; });
+    providerSelect.disabled = true;
+    try {
     for (let i = 0; i < total; i++) {
       const model      = loadedModels[i];
       freeHint.textContent =
@@ -243,8 +252,14 @@ document.addEventListener("DOMContentLoaded", async () => {
       `Done: ${working.length}/${total} models working and added.` +
       (skipped ? ` ${skipped} models skipped due to rate limits — you can try again.` : "");
 
-    verifyBtn.disabled   = false;
-    loadFreeBtn.disabled = false;
+    } catch (error) {
+      freeHint.textContent = `Verification stopped: ${error.message}`;
+    } finally {
+      verifyBtn.disabled = false;
+      loadFreeBtn.disabled = false;
+      providerSelect.disabled = false;
+      providerBtns.forEach((btn) => { btn.disabled = false; });
+    }
   });
 
   testBtn.addEventListener("click", async () => {

@@ -21,8 +21,8 @@ This project is a modern Google Chrome extension (Manifest V3) that revises ordi
   - `Ctrl + Shift + L` (Mac: `Cmd + Shift + L`) — instant in-place revision.
   - `Ctrl + Shift + U` (Mac: `Cmd + Shift + U`) — undo the last revision.
 - **Output Control**: Choice of output language (Auto/Turkish/English) and four length tiers (Short/Medium/Long/Max).
-- **Revision History**: The last 5 revisions are stored locally in encrypted form; they can be deleted individually or cleared all at once. API keys/emails are stripped out before being saved to history.
-- **Secure Storage**: Your API keys and preferences are stored entirely in local browser storage (`chrome.storage.local`); they are not sent to any third-party servers.
+- **Revision History**: The last 5 revisions are stored locally using reversible obfuscation (not secure encryption); they can be deleted individually or cleared all at once. Common API key and email patterns are redacted before saving; this is best-effort and does not detect all sensitive data.
+- **Secure Storage**: Your API keys and preferences are stored entirely in local browser storage (`chrome.storage.local`); keys are sent only to their matching API provider for authentication. Source text and generated prompts are sent to the chosen provider and, when configured, backup or consensus providers.
 
 ---
 
@@ -70,3 +70,40 @@ Follow these steps to load the extension into your browser locally:
    - Select the text and right-click to choose the **"Revise with Meta-Prompt"** option, or
    - Use the `Ctrl + Shift + L` (`Cmd + Shift + L`) shortcut.
 5. If the result is not what you expected, you can restore the original text with `Ctrl + Shift + U` (`Cmd + Shift + U`).
+
+
+## Reliability and verification
+
+In-place revisions keep the original target even if focus moves. If you edit the
+field during generation, automatic writing stops and the completed result is
+available in the popup. Interrupted streams retain an undo snapshot. Repeated
+in-place triggers on a busy tab are ignored until the current operation finishes.
+A stream that ends without its completion marker is reported as incomplete.
+
+Run the offline checks (no API keys, network requests, or build step required):
+
+```sh
+node verify_prompt.js
+node verify_brain.js
+node verify_runtime.mjs
+```
+
+After changes, reload the unpacked extension and refresh the target page. For a
+manual smoke test, revise a textarea, switch focus while generation is running,
+then undo. Also check popup generation, copy, write to page, and provider switching
+in Settings. Restricted Chrome pages and some custom editors cannot be edited;
+use Copy in those cases. Live provider calls require your configured credentials.
+
+## Interface styling
+
+`popup.css` and `options.css` define screen-specific layout. `theme.css` holds the
+shared warm neutral and forest-green palette, typography, focus states, mode cards,
+and responsive settings layout. Fonts use the system stack; no external font
+requests are needed. Reload the extension after updating styles.
+
+## Standalone macOS app
+
+An additional Apple Silicon desktop app is available at `dist/MetaPrompt.app`.
+It uses the same prompt engine with native windows, menus, clipboard integration,
+and separate local settings. See [macOS instructions](macos/README.md).
+Build it with `python3 macos/build.py`; Chrome is not required to run it.

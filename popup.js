@@ -44,8 +44,8 @@ function decryptText(ciphertext, key) {
 
 function sanitizeForHistory(text) {
   if (!text) return "";
-  let cleaned = text.replace(/(sk-[a-zA-Z0-9]{20,})/g, "[API-KEY-HIDDEN]");
-  cleaned = cleaned.replace(/([a-zA-Z0-9._-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,4})/g, "[EMAIL-HIDDEN]");
+  let cleaned = text.replace(/(sk-[a-zA-Z0-9_-]{20,})/g, "[API-KEY-HIDDEN]");
+  cleaned = cleaned.replace(/([a-zA-Z0-9._-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})/g, "[EMAIL-HIDDEN]");
   cleaned = cleaned.replace(/(password|sifre|şifre)\s*[:=]\s*[a-zA-Z0-9_.-]+/gi, "$1: [PASSWORD-HIDDEN]");
   return cleaned;
 }
@@ -200,7 +200,10 @@ document.addEventListener("DOMContentLoaded", () => {
 
   // ——— Segmented length control ———
   const syncLenSeg = (val) => {
-    lenSegBtns.forEach((btn) => btn.classList.toggle("on", btn.dataset.val === val));
+    lenSegBtns.forEach((btn) => {
+      btn.classList.toggle("on", btn.dataset.val === val);
+      btn.setAttribute("aria-pressed", String(btn.dataset.val === val));
+    });
     updateOutputDescs();
   };
 
@@ -225,7 +228,10 @@ document.addEventListener("DOMContentLoaded", () => {
 
   // ——— Segmented mode control ———
   const syncModeSeg = (val) => {
-    modeSegBtns.forEach((btn) => btn.classList.toggle("on", btn.dataset.val === val));
+    modeSegBtns.forEach((btn) => {
+      btn.classList.toggle("on", btn.dataset.val === val);
+      btn.setAttribute("aria-pressed", String(btn.dataset.val === val));
+    });
     const vibeControls = document.getElementById("vibeStrategyControls");
     if (vibeControls) {
       vibeControls.style.display = val === "vibecoding" ? "grid" : "none";
@@ -248,6 +254,9 @@ document.addEventListener("DOMContentLoaded", () => {
       syncModeSeg(btn.dataset.val);
     });
   });
+
+  syncLenSeg(lenSelect.value);
+  syncModeSeg(modeSelect.value);
 
   // ——— Result show/hide ———
   const showResult = () => {
@@ -325,7 +334,7 @@ document.addEventListener("DOMContentLoaded", () => {
   const loadHistory = async () => {
     const key = await getOrCreateEncryptionKey();
     const data = await chrome.storage.local.get(HISTORY_KEY);
-    const encryptedHistory = data[HISTORY_KEY] || [];
+    const encryptedHistory = Array.isArray(data[HISTORY_KEY]) ? data[HISTORY_KEY] : [];
     const decryptedHistory = encryptedHistory.map(item => {
       const rawDecrypted = decryptText(item.encryptedData || "", key);
       try {
@@ -333,7 +342,7 @@ document.addEventListener("DOMContentLoaded", () => {
       } catch (e) {
         return null;
       }
-    }).filter(Boolean);
+    }).filter((item) => item && typeof item.raw === "string" && typeof item.result === "string");
     
     renderHistory(decryptedHistory);
     return decryptedHistory;
@@ -483,7 +492,7 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     const { apiKey } = await getActiveConfig();
-    if (!apiKey) {
+    if (!apiKey && !globalThis.desktopAccountProvider) {
       setStatus("No API key. Add one in Settings.", "error");
       return;
     }
@@ -497,6 +506,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
     // Start busy state
     revizeEtBtn.disabled = true;
+    redoBtn.disabled = copyBtn.disabled = writePageBtn.disabled = true;
     revizeEtBtn.classList.add("busy");
     output.value = "";
     setStatus("", "info");
@@ -547,6 +557,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
         if (response.type === "error") {
           setStatus(response.error || "A background error occurred", "error");
+          if (streamed && doneMsg) doneMsg.textContent = "Incomplete response";
           if (!streamed) hideResult();
           resetReviseBtn();
           port.disconnect();
@@ -584,9 +595,14 @@ document.addEventListener("DOMContentLoaded", () => {
         }
 
         showResult();
-        await saveToHistory(rawText, result);
-        resetReviseBtn();
-        port.disconnect();
+        try {
+          await saveToHistory(rawText, result);
+        } catch (_) {
+          setStatus("Prompt is ready, but history could not be saved. You can still copy it.", "error");
+        } finally {
+          resetReviseBtn();
+          port.disconnect();
+        }
       });
 
       port.onDisconnect.addListener(() => {
@@ -618,6 +634,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
   function resetReviseBtn() {
     revizeEtBtn.disabled = false;
+    redoBtn.disabled = copyBtn.disabled = writePageBtn.disabled = false;
     revizeEtBtn.classList.remove("busy");
     if (reviseProgress) reviseProgress.style.width = "0%";
   }

@@ -46,13 +46,13 @@ const ALL_FIELDS = [
 
 export async function getStoredConfig() {
   const data = await chrome.storage.local.get(ALL_FIELDS);
-  return { provider: DEFAULT_PROVIDER, ...data };
+  return { ...data, provider: Object.hasOwn(PROVIDERS, data.provider) ? data.provider : DEFAULT_PROVIDER };
 }
 
 // Returns the active provider's {provider, apiKey, model}.
 export async function getActiveConfig() {
   const stored = await getStoredConfig();
-  const provider = stored.provider || DEFAULT_PROVIDER;
+  const provider = Object.hasOwn(PROVIDERS, stored.provider) ? stored.provider : DEFAULT_PROVIDER;
   const meta = PROVIDERS[provider] || PROVIDERS[DEFAULT_PROVIDER];
   return {
     provider,
@@ -66,7 +66,7 @@ export async function getActiveConfig() {
 // paths use this, so the model-list logic stays in one place.
 export async function getFailoverConfig() {
   const stored = await chrome.storage.local.get([...ALL_FIELDS, "openrouterWorkingModels"]);
-  const provider = stored.provider || DEFAULT_PROVIDER;
+  const provider = Object.hasOwn(PROVIDERS, stored.provider) ? stored.provider : DEFAULT_PROVIDER;
   const meta = PROVIDERS[provider] || PROVIDERS[DEFAULT_PROVIDER];
   const apiKeys = {
     anthropic: stored.anthropicKey || "",
@@ -74,7 +74,9 @@ export async function getFailoverConfig() {
   };
   const activeModel = stored[meta.modelField] || meta.defaultModel;
 
-  const working = stored.openrouterWorkingModels || [];
+  const working = Array.isArray(stored.openrouterWorkingModels)
+    ? stored.openrouterWorkingModels.filter((m) => m && typeof m.id === "string" && m.id.trim())
+    : [];
   let models = [activeModel];
   if (provider === "openrouter") {
     models = [activeModel, ...working.map((m) => m.id).filter((id) => id && id !== activeModel)];
@@ -84,5 +86,5 @@ export async function getFailoverConfig() {
     models = [activeModel, ...working.map((m) => m.id).filter(Boolean)];
   }
 
-  return { provider, apiKey: apiKeys[provider], apiKeys, models };
+  return { provider, apiKey: apiKeys[provider], apiKeys, models: [...new Set(models.map((m) => m.trim()).filter(Boolean))] };
 }

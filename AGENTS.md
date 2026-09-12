@@ -6,7 +6,7 @@ This file provides guidance to Codex (Codex.ai/code) when working with code in t
 
 A Chrome Manifest V3 extension ("Meta-Prompt Motoru") that rewrites raw user text inside any page's `<input>`/`<textarea>` into an expert-grade prompt, in place. It calls either the Anthropic Messages API directly or OpenRouter, with automatic failover across a configured model list.
 
-There is no build step, no package.json, no tests, and no lint config. Development means editing the JS files and reloading the unpacked extension in Chrome.
+There is no build step, no package.json, and no lint config. Standalone offline checks cover prompts, the brain simulation, and runtime behavior. Development means editing the JS files and reloading the unpacked extension in Chrome.
 
 ## Loading / "running" the extension
 
@@ -46,10 +46,12 @@ Key cross-file contracts:
 - All persistent state lives in `chrome.storage.local`. Notable keys: `provider`, `anthropicKey`/`anthropicModel`, `openrouterKey`/`openrouterModel`, `openrouterWorkingModels`, `language`, `length`, `consensusCheck`, `selectedText`, `lastInPlaceResult`, `lastError`, plus the SNN state keys written by `brain_helper.js`.
 - `background.js` is an ES module service worker (`"type": "module"` in manifest) — use `import` statements, not `importScripts`. Dynamic `import()` is used for `brain_helper.js` reward path to avoid loading it on every cold start.
 - Badge text on `chrome.action` is the primary user feedback for the in-place flow (`…`, `✓`, `copy`, `key`, `err`, `?`, `↩`). Always pair `setBadge` with `clearBadgeLater` to avoid sticky badges.
-- `verify_brain.js` (SNN) and `verify_prompt.js` (prompt layer) are standalone diagnostic scripts — not wired into the extension runtime. Run with `node verify_prompt.js` after changing `prompt.js` (60 structural checks); `node verify_prompt.js --show "<raw text>"` dumps the system prompt + user message a given input would produce.
+- `verify_brain.js` (SNN) and `verify_prompt.js` (prompt layer) are standalone diagnostic scripts — not wired into the extension runtime. Run with `node verify_prompt.js` after changing `prompt.js` (100 structural checks); `node verify_prompt.js --show "<raw text>"` dumps the system prompt + user message a given input would produce.
 
 ## Reference docs in repo
 
 - `README.md` — user-facing install/usage (English).
 - `methodology.md` — the Ana Beyin prompt methodology this extension implements.
 - `compliance.md`, `performance_report.md` — design notes; read these before substantive changes to `prompt.js` or `brain_network.js`.
+
+- `node verify_runtime.mjs` checks provider key isolation, configuration recovery, streaming failure handling, focus locking, and undo with offline mocks.

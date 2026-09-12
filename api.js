@@ -42,18 +42,21 @@ async function postJson(url, headers, body) {
       signal: controller.signal
     });
   } catch (networkError) {
+    clearTimeout(timer);
     if (networkError.name === "AbortError") {
       throw new Error(`Request timed out (${REQUEST_TIMEOUT_MS / 1000} s).`);
     }
     throw new Error(`Could not connect to the network: ${networkError.message}`);
+  }
+  try {
+    if (!res.ok) {
+      const detail = await res.text();
+      throw new Error(`API error ${res.status}: ${parseErrorMessage(detail) || res.statusText}`);
+    }
+    return await res.json();
   } finally {
     clearTimeout(timer);
   }
-  if (!res.ok) {
-    const detail = await res.text().catch(() => "");
-    throw new Error(`API error ${res.status}: ${parseErrorMessage(detail) || res.statusText}`);
-  }
-  return res.json();
 }
 
 async function reviseAnthropic({ apiKey, model, system, userText, maxTokens }) {
@@ -146,6 +149,12 @@ export function detectProvider(model, defaultProvider = "anthropic") {
   return defaultProvider;
 }
 
+// A key belongs to one provider and must never cross provider boundaries.
+function resolveKey(detectedProvider, provider, apiKey, apiKeys) {
+  const key = apiKeys ? apiKeys[detectedProvider] : detectedProvider === provider ? apiKey : "";
+  return typeof key === "string" ? key.trim() : "";
+}
+
 export async function revise({ provider, apiKey, apiKeys, model, system, userText, maxTokens = 2048 }) {
   const modelClean = (model || "").trim();
   if (!modelClean) {
@@ -153,13 +162,8 @@ export async function revise({ provider, apiKey, apiKeys, model, system, userTex
   }
   const detectedProv = detectProvider(modelClean, provider);
   
-  let activeKey = "";
-  if (apiKeys && apiKeys[detectedProv]) {
-    activeKey = apiKeys[detectedProv].trim();
-  } else if (apiKey) {
-    activeKey = apiKey.trim();
-  }
-  
+  const activeKey = resolveKey(detectedProv, provider, apiKey, apiKeys);
+
   if (!activeKey) {
     throw new Error(`API key not set (${detectedProv === "openrouter" ? "OpenRouter" : "Anthropic"}). Enter your key in the Settings screen first.`);
   }
@@ -207,9 +211,27 @@ async function streamSSE(url, headers, body, onData) {
     throw new Error(`API error ${res.status}: ${parseErrorMessage(detail) || res.statusText}`);
   }
 
+  if (!res.body) {
+    clearTimeout(idleTimer);
+    throw new Error("The server returned no response stream.");
+  }
   const reader = res.body.getReader();
   const decoder = new TextDecoder();
   let buffer = "";
+  let completed = false;
+  const consumeLine = (line) => {
+    const trimmed = line.trim();
+    if (!trimmed.startsWith("data:")) return;
+    const payload = trimmed.slice(5).trim();
+    if (!payload) return;
+    if (payload === "[DONE]") { completed = true; return; }
+    const json = JSON.parse(payload);
+    if (json.error || json.type === "error") {
+      throw new Error(`API error: ${parseErrorMessage(payload)}`);
+    }
+    onData(json);
+    if (json.type === "message_stop") completed = true;
+  };
   try {
     while (true) {
       const { done, value } = await reader.read();
@@ -218,16 +240,12 @@ async function streamSSE(url, headers, body, onData) {
       buffer += decoder.decode(value, { stream: true });
       const lines = buffer.split("\n");
       buffer = lines.pop(); // the last chunk may be incomplete; keep it for the next round
-      for (const line of lines) {
-        const trimmed = line.trim();
-        if (!trimmed.startsWith("data:")) continue;
-        const payload = trimmed.slice(5).trim();
-        if (!payload || payload === "[DONE]") continue;
-        let json;
-        try { json = JSON.parse(payload); } catch (_) { continue; }
-        onData(json);
-      }
+      for (const line of lines) consumeLine(line);
+      if (completed) break;
     }
+    buffer += decoder.decode();
+    if (buffer.trim()) consumeLine(buffer);
+    if (!completed) throw new Error("The response stream ended early. Partial output was preserved; try again.");
   } catch (streamError) {
     if (streamError.name === "AbortError") {
       throw new Error(`Stream timed out (${STREAM_IDLE_TIMEOUT_MS / 1000} s of silence).`);
@@ -235,6 +253,8 @@ async function streamSSE(url, headers, body, onData) {
     throw streamError;
   } finally {
     clearTimeout(idleTimer);
+    await reader.cancel().catch(() => {});
+    reader.releaseLock();
   }
 }
 
@@ -314,9 +334,9 @@ export async function reviseStreamWithFailover({ provider, apiKey, apiKeys, mode
   for (let i = 0; i < list.length; i++) {
     const modelClean = list[i].trim();
     const detectedProv = detectProvider(modelClean, provider);
-    const activeKey = ((apiKeys && apiKeys[detectedProv]) || apiKey || "").trim();
+    const activeKey = resolveKey(detectedProv, provider, apiKey, apiKeys);
     if (!activeKey) {
-      lastError = new Error(`API anahtari ayarlanmamis (${detectedProv}).`);
+      lastError = new Error(`API key not set (${detectedProv}).`);
       continue;
     }
 

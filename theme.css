@@ -1,0 +1,92 @@
+/* Shared visual language for the popup and the full-page settings screen. */
+:root { color-scheme: light; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+html, body { background: #f4f4ee; }
+.mp-popup, .mp-settings {
+  --s0: #f4f4ee; --s1: #fff; --s2: #eaeee5;
+  --bd: #dce0d5; --bd2: #c2ccbb; --tx: #24382e;
+  --dim: #59685d; --faint: #687467; --accent: #285c42;
+  --accent-soft: #e4edde; --add: #28714b; --del: #ad353e;
+  background: var(--s0); color: var(--tx);
+}
+button, input, select, textarea { font-family: inherit; }
+button { transition: background .15s, border-color .15s, box-shadow .15s; }
+button:disabled { opacity: .55; cursor: not-allowed; }
+:focus-visible { outline: 2px solid #357a51 !important; outline-offset: 3px; }
+.popup-page { width: 440px; }
+.mp-pop-head, .ms-head { padding: 17px 22px; background: #f4f4ee; border-bottom: 1px solid var(--bd); }
+.mp-logo, .ms-logo { width: 34px; height: 34px; border-radius: 11px; background: #285c42; color: #fff; box-shadow: none; }
+.mp-word, .ms-title { font-family: inherit; font-size: 17px; font-weight: 700; letter-spacing: -.7px; }
+.mp-sub, .ms-sub { font-size: 9px; letter-spacing: 1.5px; color: var(--dim); }
+.mp-ver { border-radius: 20px; background: transparent; margin-left: 3px; }
+.mp-icon-btn { width: 34px; height: 34px; background: #fff; border-color: var(--bd); border-radius: 50%; }
+.mp-pop-body { padding: 20px 22px; max-height: 520px; scrollbar-color: #bdc8b8 transparent; scrollbar-width: thin; }
+.intro { margin: 0 0 22px; }
+.eyebrow { font-size: 9px; font-weight: 700; letter-spacing: 1.7px; color: #526849; }
+.intro h1 { margin: 10px 0 8px; font-size: 28px; line-height: 1.12; font-weight: 600; letter-spacing: -1.2px; }
+.intro p { margin: 0; font-size: 12px; line-height: 1.6; color: var(--dim); }
+.mp-label, .ms-label { color: #52634f; font-size: 10px; letter-spacing: .8px; }
+.mp-source { min-height: 106px; padding: 14px; border-radius: 12px; font-size: 13px; line-height: 1.65; box-shadow: 0 2px 3px #24382e03; }
+.mp-source::placeholder { color: #7a8277; }
+.mp-controls { margin-top: 16px; gap: 14px; }
+.mp-ctrl { min-width: 0; gap: 8px; }
+.mp-select, .mp-seg { min-height: 38px; border-radius: 9px; }
+.mp-seg { background: #e9ece3; border-color: transparent; }
+.mp-seg-btn.on { background: #fff; color: #285c42; box-shadow: 0 1px 4px #24382e12; }
+.mp-mode-desc { font-size: 10.5px; line-height: 1.5; }
+#modeSeg { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; padding: 0; margin-top: 2px; background: none; border: none; }
+#modeSeg .mp-seg-btn { display: flex; align-items: center; text-align: left; gap: 9px; min-height: 62px; padding: 10px; border: 1px solid var(--bd); border-radius: 10px; background: #fff; color: var(--tx); font-size: 12px; font-weight: 600; }
+#modeSeg .mp-seg-btn.on { border-color: #64855c; background: #e8efdf; box-shadow: inset 0 0 0 1px #64855c; }
+#modeSeg small { display: block; margin-top: 4px; font-size: 9px; font-weight: 400; color: var(--dim); }
+.mode-icon { display: grid; place-items: center; width: 26px; height: 28px; flex-shrink: 0; font-size: 23px; font-weight: 400; color: #52714a; }
+#consensusRow { padding: 12px 0; border-top: 1px solid var(--bd); margin-top: 16px !important; gap: 10px !important; text-transform: none; letter-spacing: 0; }
+#consensusRow input { accent-color: #285c42; width: 16px; height: 16px; flex-shrink: 0; }
+#consensusRow strong { font-size: 11px; font-weight: 600; color: var(--tx); }
+#consensusRow small { display: block; margin-top: 4px; font-size: 10px; line-height: 1.4; font-weight: 400; color: var(--dim); }
+.mp-btn, .ms-btn { min-height: 43px; border-radius: 10px; }
+.mp-btn.accent, .ms-btn.accent { background: #285c42; color: #fff; box-shadow: 0 3px 7px #24382e12; }
+.mp-btn.accent:hover, .ms-btn.accent:hover { background: #204d36; filter: none; }
+.mp-btn.revise { margin-top: 3px; }
+.mp-btn.revise.busy { background: #e4eadd; color: #285c42; }
+.mp-spin { border-color: #bdc8b8; border-top-color: #285c42; }
+.mp-status:not(:empty) { padding: 10px 12px; border-radius: 8px; background: #fff; overflow-wrap: anywhere; }
+.mp-status.error { background: #fff0ed; }
+.mp-tabs { padding: 0; border: 0; background: transparent; }
+.mp-tab.on { justify-content: flex-start; background: transparent; font-size: 10px; letter-spacing: 1px; color: var(--dim); }
+textarea#output { font: 12px/1.75 ui-monospace, SFMono-Regular, Consolas, monospace; padding: 15px; min-height: 180px; background: #fffefa; border-color: #d7ddce; }
+.mp-done-bar { white-space: normal; align-items: flex-start; line-height: 1.5; }
+.mp-done-dot { margin-top: 5px; box-shadow: none; }
+.mp-recent-item { padding: 11px; border: 1px solid var(--bd); }
+.mp-recent-del { display: inline-flex; }
+.settings-page { width: auto; min-width: 320px; padding: 36px 24px; }
+.mp-settings { width: min(100%, 650px); min-height: 0; margin: 0 auto; border: 1px solid #dce0d5; border-radius: 20px; overflow: hidden; box-shadow: 0 12px 48px #283d2910; }
+.ms-head { padding: 21px 30px; }
+.ms-body { padding: 30px; }
+.ms-body .intro { margin-bottom: 24px; }
+.ms-body .intro h1 { font-size: 36px; letter-spacing: -1.5px; }
+.ms-body .intro p { font-size: 13px; }
+.ms-hero { padding: 16px; background: #e8efdf; border-color: #d4dec9; border-radius: 12px; }
+.ms-hero-ic { background: #d9e5ce; }
+.ms-hero-s { font-size: 12px; line-height: 1.6; }
+.ms-field { margin-bottom: 21px; gap: 9px; }
+.ms-seg { padding: 4px; background: #e9ece3; border-color: transparent; }
+.ms-seg-btn { min-height: 42px; }
+.ms-seg-btn.on { background: #fff; color: #285c42; box-shadow: 0 1px 4px #24382e12; }
+.ms-input, #model, .ms-select, #tierSelect, #modelSelect { min-height: 45px; font-size: 13px; }
+.ms-input.mono, #model { font-family: ui-monospace, SFMono-Regular, Consolas, monospace; letter-spacing: 0; }
+.ms-hint { font-size: 12px; line-height: 1.6; overflow-wrap: anywhere; }
+#loadFreeBtn, #verifyBtn { min-height: 40px; align-items: center; justify-content: center; }
+.ms-div { margin-bottom: 22px; }
+@media (max-width: 480px) { .settings-page { padding: 0; } .mp-settings { border: none; border-radius: 0; } .ms-body, .ms-head { padding: 22px; } }
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }
+
+/* Account controls are inserted only by the standalone desktop host. */
+.account-panel { padding: 20px; margin-bottom: 24px; background: #e8efdf; border: 1px solid #cbd8c1; border-radius: 14px; }
+.account-panel h2 { margin: 8px 0; font-size: 20px; letter-spacing: -.5px; }
+.account-panel p { font-size: 12px; line-height: 1.6; margin: 8px 0 14px; color: #4c604b; overflow-wrap: anywhere; }
+.account-panel label { display: block; font-size: 11px; font-weight: 600; margin-bottom: 7px; }
+.account-panel select { width: 100%; padding: 12px; border: 1px solid #cbd8c1; background: white; border-radius: 8px; color: #24382e; }
+.account-actions { display: flex; gap: 8px; margin-top: 12px; }
+.account-actions button { padding: 10px 14px; border-radius: 8px; border: 1px solid #cbd8c1; background: white; color: #285c42; cursor: pointer; }
+.account-actions button:first-child { background: #285c42; color: white; }
+.account-panel #accountStatus { margin-bottom: 0; font-weight: 500; }
+.ms-body > [hidden] { display: none !important; }

@@ -10,6 +10,8 @@ import { runBrainSimulation } from "./brain_helper.js";
 const MENU_TO_POPUP = "revizeMetaPrompt";
 const MENU_INPLACE = "revizeInPlace";
 const MENU_UNDO = "revizeUndo";
+const activeRevisions = new Set();
+const badgeTimers = new Map();
 
 chrome.runtime.onInstalled.addListener(() => {
   // Clear existing menus (prevents duplicate id errors).
@@ -91,12 +93,17 @@ function sendToTab(tabId, message) {
 }
 
 function setBadge(tabId, text, color) {
-  chrome.action.setBadgeBackgroundColor({ color });
+  clearTimeout(badgeTimers.get(tabId));
+  chrome.action.setBadgeBackgroundColor({ color, tabId });
   chrome.action.setBadgeText({ text, tabId });
 }
 
 function clearBadgeLater(tabId, ms = 4000) {
-  setTimeout(() => chrome.action.setBadgeText({ text: "", tabId }), ms);
+  clearTimeout(badgeTimers.get(tabId));
+  badgeTimers.set(tabId, setTimeout(() => {
+    badgeTimers.delete(tabId);
+    chrome.action.setBadgeText({ text: "", tabId });
+  }, ms));
 }
 
 // Cross-model consensus check: has a model DIFFERENT from the producing model
@@ -128,14 +135,16 @@ async function runConsensusCheck({ provider, apiKeys, models, usedModel, rawText
 }
 
 async function reviseInPlace(tab, selectionText = "") {
-  if (!tab || tab.id == null) return;
+  if (!tab || tab.id == null || activeRevisions.has(tab.id)) return;
   const tabId = tab.id;
+  activeRevisions.add(tabId);
+  let writeQueue = Promise.resolve();
 
   try {
     setBadge(tabId, "…", "#1a73e8");
 
     // 1) Get the text: active box first, otherwise the selected text.
-    const got = await sendToTab(tabId, { type: "GET_EDITABLE_TEXT" });
+    const got = await sendToTab(tabId, { type: "GET_EDITABLE_TEXT", captureTarget: true });
     let text = (got && got.text) || selectionText || "";
     text = text.trim();
     if (!text) {
@@ -210,12 +219,14 @@ async function reviseInPlace(tab, selectionText = "") {
         const now = Date.now();
         if (!writeBroken && now - lastWriteAt >= 150) {
           lastWriteAt = now;
-          streamWrite(acc, false); // continue without awaiting; ordering is FIFO per tab
+          const snapshot = acc;
+          writeQueue = writeQueue.then(() => streamWrite(snapshot, false));
         }
       }
     });
 
     // 5) Final write: full result + done=true (binds the undo state).
+    await writeQueue;
     const wroteOk = !writeBroken && await streamWrite(result, true);
     if (wroteOk) {
       setBadge(tabId, "✓", "#34a853");
@@ -239,6 +250,9 @@ async function reviseInPlace(tab, selectionText = "") {
     chrome.storage.local.set({ lastError: String((error && error.message) || error) });
     setBadge(tabId, "err", "#d93025");
   } finally {
+    await writeQueue;
+    await sendToTab(tabId, { type: "END_EDITABLE_STREAM" });
+    activeRevisions.delete(tabId);
     clearBadgeLater(tabId);
   }
 }
@@ -258,6 +272,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 async function handleRewardBrainMessage(message, sendResponse) {
   try {
     const { rewardVal } = message;
+    if (!Number.isFinite(rewardVal) || Math.abs(rewardVal) > 1) throw new Error("Invalid reward value.");
     const { rewardBrain } = await import("./brain_helper.js");
     await rewardBrain(rewardVal);
     sendResponse({ ok: true });
@@ -269,7 +284,9 @@ async function handleRewardBrainMessage(message, sendResponse) {
 // Shared preparation for the REVISE_PROMPT / stream path: resolve strategies,
 // run the SNN, and build the provider/model plan and the prompts.
 async function prepareRevision(message) {
-  const { language, length, mode, rawText } = message;
+  const { language = "auto", length = "orta", mode = "standard", rawText } = message;
+  if (typeof rawText !== "string" || !rawText.trim()) throw new Error("Enter some text to revise.");
+  if (rawText.length > 100000) throw new Error("Source text is too long. Use at most 100,000 characters.");
   // Auto-resolve sub-strategies based on raw text intent when "auto" or absent.
   const vibeStrategy      = resolveAutoStrategy("vibecoding", message.vibeStrategy      || "auto", rawText);
   const researchStrategy  = resolveAutoStrategy("research",   message.researchStrategy  || "auto", rawText);
@@ -337,6 +354,7 @@ chrome.runtime.onConnect.addListener((port) => {
   if (port.name !== "revise") return;
 
   let disconnected = false;
+  let busy = false;
   port.onDisconnect.addListener(() => { disconnected = true; });
   const safePost = (msg) => {
     if (disconnected) return;
@@ -344,9 +362,18 @@ chrome.runtime.onConnect.addListener((port) => {
   };
 
   port.onMessage.addListener(async (message) => {
-    if (message.type !== "REVISE_PROMPT_STREAM") return;
+    if (message.type !== "REVISE_PROMPT_STREAM" || busy || disconnected) return;
+    busy = true;
     try {
       const plan = await prepareRevision(message);
+      if (globalThis.desktopAccountProvider && globalThis.desktopRevise) {
+        const provider = globalThis.desktopAccountProvider;
+        safePost({ type: "delta", text: "" });
+        const result = await globalThis.desktopRevise(provider, plan);
+        safePost({ type: "done", result, usedModel: { chatgpt: "ChatGPT account (Codex)", opencode: "OpenCode (default model)" }[provider] || "Claude account (Claude Code)",
+          fellBack: false, consensus: null, snnValues: plan.snnValues, resolvedStrategy: plan.resolvedStrategy });
+        return;
+      }
       const { result, usedModel, fellBack } = await reviseStreamWithFailover({
         provider: plan.provider,
         apiKey: plan.apiKeys[plan.provider],
@@ -366,6 +393,8 @@ chrome.runtime.onConnect.addListener((port) => {
       safePost({ type: "done", result, usedModel, fellBack, consensus, snnValues: plan.snnValues, resolvedStrategy: plan.resolvedStrategy });
     } catch (error) {
       safePost({ type: "error", error: error.message || String(error) });
+    } finally {
+      busy = false;
     }
   });
 });
