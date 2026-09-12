@@ -60,7 +60,24 @@ const DETECT_CASES = [
   ["compare two suppliers in terms of advantage and disadvantage", "analysis"],
   ["what is a postal code", "explain"],
   ["hello how are you", "general"],
-  ["", "general"]
+  ["", "general"],
+  ["Bu metni özetle", "summary"],
+  ["İngilizceye çevir", "translation"],
+  ["İNGİLİZCEYE ÇEVİR", "translation"],
+  ["Bu kavramı açıkla", "explain"],
+  ["Müdüre e-posta yaz", "email"],
+  ["İki ürünü karşılaştır", "analysis"],
+  ["Bir yol haritası hazırla", "planning"],
+  ["Kısa bir şiir yaz", "creative"],
+  ["Bir fonksiyon yaz", "coding"],
+  ["Posta kodu nedir?", "explain"],
+  ["API hatasını düzelt", "coding"],
+  ["(python)", "coding"],
+  ["gift", "general"],
+  ["address", "general"],
+  ["classical music", "general"],
+  ["advice", "general"],
+  ["planet", "general"]
 ];
 for (const [text, want] of DETECT_CASES) {
   const got = detectTaskType(text);
@@ -194,6 +211,24 @@ const judge = buildConsensusJudgeMessages("raw text 42", "candidate prompt");
 assert(judge.system.includes("VERDICT: OK") && judge.system.includes("VERDICT: ISSUES"), "consensus judge: strict verdict format mandated");
 assert(judge.userText.includes("<raw_text>") && judge.userText.includes("raw text 42") && judge.userText.includes("<candidate_prompt>"), "consensus judge: raw text and candidate wrapped in tags");
 assert(judge.system.toLowerCase().includes("data"), "consensus judge: injection guard (treat as data) present");
+
+// All runtime modes and length tiers must receive the same quality controls.
+for (const mode of ["standard", "vibecoding", "research", "antihallu"]) {
+  for (const length of Object.keys(LENGTH_PROFILES)) {
+    const prompt = buildSystemPrompt("tr", "Tek fonksiyondaki hatayı düzelt; bağımlılık ekleme.", null, mode, "standard", "web", "rag", length);
+    const contractIndex = prompt.lastIndexOf("PROMPT QUALITY CONTRACT");
+    assert(contractIndex !== -1, `${mode}/${length}: shared quality contract included`);
+    assert(prompt.indexOf(LENGTH_PROFILES[length].directive, contractIndex) > contractIndex,
+      `${mode}/${length}: requested length applies after template`);
+    assert(prompt.lastIndexOf("CRITICAL OUTPUT LANGUAGE") > contractIndex,
+      `${mode}/${length}: language remains the final mandate`);
+  }
+}
+assert(!midBase.includes("<thought>"), "standard: no hidden thought transcript requested");
+assert(midBase.includes('RAW TEXT: "Use Python with pandas and matplotlib'),
+  "example: technology constraints are grounded in the example input");
+assert(buildSystemPrompt("tr", "Use FooBar at https://example.com").includes("preserve source names, URLs, code identifiers"),
+  "translation mandate preserves literal source details");
 
 const snnPrompt = buildSystemPrompt("auto", "write code", { ACh: 0.7, NE: 0.2, DA: 0.5 });
 assert(snnPrompt.includes("0.700"), "SNN values folded into system prompt when provided");
