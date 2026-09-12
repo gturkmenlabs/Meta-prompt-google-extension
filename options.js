@@ -1,4 +1,4 @@
-import { PROVIDERS, DEFAULT_PROVIDER, getStoredConfig } from "./config.js";
+import { PROVIDERS, DEFAULT_PROVIDER, getStoredConfig, CROSS_PROVIDER_FALLBACK_KEY, MAX_BACKUP_MODELS } from "./config.js";
 import { fetchOpenRouterModels, revise } from "./api.js";
 
 document.addEventListener("DOMContentLoaded", async () => {
@@ -17,6 +17,20 @@ document.addEventListener("DOMContentLoaded", async () => {
   const saveBtn        = document.getElementById("saveBtn");
   const saved          = document.getElementById("saved");
   const showKeyBtn     = document.getElementById("showKeyBtn");
+  const crossProviderToggle = document.getElementById("crossProviderToggle");
+  const maxBackupCount      = document.getElementById("maxBackupCount");
+
+  // ——— Cross-provider fallback (opt-in) ———
+  // Persisted on change, like the popup toggles, so it applies to the shortcut
+  // and context-menu paths too without needing Save.
+  if (maxBackupCount) maxBackupCount.textContent = String(MAX_BACKUP_MODELS);
+  if (crossProviderToggle) {
+    const savedFallback = await chrome.storage.local.get(CROSS_PROVIDER_FALLBACK_KEY);
+    crossProviderToggle.checked = savedFallback[CROSS_PROVIDER_FALLBACK_KEY] === true;
+    crossProviderToggle.addEventListener("change", () =>
+      chrome.storage.local.set({ [CROSS_PROVIDER_FALLBACK_KEY]: crossProviderToggle.checked })
+    );
+  }
 
   // ——— Provider segmented buttons ———
   const providerBtns = document.querySelectorAll("[data-provider]");
@@ -112,7 +126,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       fillDatalist(orList);
       fillSelect(orList, modelInput.value);
       freeHint.textContent = workingModels
-        ? `${workingModels.length} verified working models in the list.`
+        ? `${workingModels.length} verified models available to pick from.`
         : `${loadedModels.length} models in the list.`;
     } else {
       fillDatalist(meta.modelSuggestions.map((id) => ({ id, name: id })));
@@ -249,7 +263,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     fillDatalist(working);
     fillSelect(working, modelInput.value);
     freeHint.textContent =
-      `Done: ${working.length}/${total} models working and added.` +
+      `Done: ${working.length}/${total} models available to pick from.` +
       (skipped ? ` ${skipped} models skipped due to rate limits — you can try again.` : "");
 
     } catch (error) {

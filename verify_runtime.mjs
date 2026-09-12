@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import vm from 'node:vm';
 import { revise, reviseStreamWithFailover } from './api.js';
-import { getFailoverConfig, getActiveConfig } from './config.js';
+import { getFailoverConfig, getActiveConfig, MAX_BACKUP_MODELS } from './config.js';
 
 let stored = { provider: 'invalid', anthropicKey: 'a', openrouterWorkingModels: {} };
 globalThis.chrome = { storage: { local: { get: async () => stored } } };
@@ -10,6 +10,19 @@ assert.equal((await getActiveConfig()).provider, 'anthropic');
 assert.equal((await getFailoverConfig()).models.length, 1);
 stored = { provider: 'openrouter', openrouterKey: 'b', openrouterModel: 'test/model', openrouterWorkingModels: [null, {id:'test/model'}, {id:'other/model'}, {id:'other/model'}] };
 assert.deepEqual((await getFailoverConfig()).models, ['test/model', 'other/model']);
+// Backups never leave the active provider unless the user opted in.
+const manyModels = Array.from({length: 12}, (_, i) => ({id: `vendor/model-${i}`}));
+stored = { provider: 'anthropic', anthropicKey: 'a', openrouterKey: 'b', openrouterWorkingModels: manyModels };
+assert.deepEqual((await getFailoverConfig()).models, ['claude-sonnet-4-6'], 'Cross-provider fallback is off by default');
+stored = { ...stored, crossProviderFallback: true };
+const optedIn = (await getFailoverConfig()).models;
+assert.equal(optedIn[0], 'claude-sonnet-4-6');
+assert.ok(optedIn.includes('vendor/model-0'), 'Opt-in adds cross-provider backups');
+// The backup list is capped: an unbounded list means minutes of hanging and the
+// source text reaching models the user never picked.
+assert.equal(optedIn.length, MAX_BACKUP_MODELS + 1, 'Backup list is capped');
+stored = { provider: 'openrouter', openrouterKey: 'b', openrouterModel: 'test/model', openrouterWorkingModels: manyModels };
+assert.equal((await getFailoverConfig()).models.length, MAX_BACKUP_MODELS + 1, 'Same-provider list is capped too');
 let calls = 0;
 globalThis.fetch = async () => { calls++; throw new Error('Unexpected request'); };
 await assert.rejects(revise({provider:'anthropic', apiKey:'secret', model:'other/model'}), /API key not set/);

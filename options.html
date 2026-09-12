@@ -101,6 +101,24 @@
 
       <div class="ms-div"></div>
 
+      <!-- Cross-provider fallback (opt-in: sends the source text to another provider) -->
+      <div class="ms-field">
+        <label for="crossProviderToggle"
+               style="display:flex; align-items:flex-start; gap:8px; cursor:pointer;">
+          <input type="checkbox" id="crossProviderToggle" style="margin:3px 0 0 0;">
+          <span>
+            <strong>Allow backup models from the other provider</strong>
+            <span class="ms-hint" style="display:block; margin-top:2px;">
+              Off by default. When on and the active provider fails, your source text is
+              sent to verified models on the other provider instead. At most
+              <span id="maxBackupCount">3</span> backup models are tried per revision.
+            </span>
+          </span>
+        </label>
+      </div>
+
+      <div class="ms-div"></div>
+
       <!-- Test connection -->
       <div class="ms-field">
         <button class="ms-btn ghost" id="testBtn" type="button">

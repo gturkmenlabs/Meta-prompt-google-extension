@@ -15,14 +15,15 @@ This project is a modern Google Chrome extension (Manifest V3) that revises ordi
   - Direct Anthropic Messages API (Claude Sonnet, Haiku, Opus, etc.).
   - Support for hundreds of open-source and commercial models via the OpenRouter API.
 - **Smart Error Handling and Failover**:
-  - When a model is busy or returns an error, automatic switching to the next alternative model (including across providers).
+  - When a model is busy or returns an error, automatic switching to the next alternative model. At most 3 backup models are tried per revision, so a failing provider cannot hang the request for minutes.
+  - Backups stay within the active provider. Sending your text to the *other* provider is opt-in, off by default, and enabled with a single checkbox in Settings.
   - Halting needless retries on critical authorization errors such as 401/403; 90 s request / 30 s stream-silence timeouts.
 - **Quick Shortcuts**:
   - `Ctrl + Shift + L` (Mac: `Cmd + Shift + L`) — instant in-place revision.
   - `Ctrl + Shift + U` (Mac: `Cmd + Shift + U`) — undo the last revision.
 - **Output Control**: Choice of output language (Auto/Turkish/English) and four length tiers (Short/Medium/Long/Max).
 - **Revision History**: The last 5 revisions are stored locally using reversible obfuscation (not secure encryption); they can be deleted individually or cleared all at once. Common API key and email patterns are redacted before saving; this is best-effort and does not detect all sensitive data.
-- **Secure Storage**: Your API keys and preferences are stored entirely in local browser storage (`chrome.storage.local`); keys are sent only to their matching API provider for authentication. Source text and generated prompts are sent to the chosen provider and, when configured, backup or consensus providers.
+- **Secure Storage**: Your API keys and preferences are stored entirely in local browser storage (`chrome.storage.local`); keys are sent only to their matching API provider for authentication. Source text and generated prompts are sent to the model you selected, and to backup models on that same provider if it fails. They reach a different provider only if you turn on cross-provider fallback in Settings, and reach a second model only if you turn on the consensus check.
 
 ---
 

@@ -38,6 +38,16 @@ export const PROVIDERS = {
 
 export const DEFAULT_PROVIDER = "anthropic";
 
+// Hard ceiling on how many backup models a single revision may try. Each attempt
+// sends the full source text to another model and can burn the 90 s request
+// timeout, so an unbounded list means both minutes of hanging and the text
+// reaching models the user never picked.
+export const MAX_BACKUP_MODELS = 3;
+
+// Sending the source text to a DIFFERENT provider than the active one is opt-in:
+// the user enables it explicitly in Settings. Default off.
+export const CROSS_PROVIDER_FALLBACK_KEY = "crossProviderFallback";
+
 const ALL_FIELDS = [
   "provider",
   "anthropicKey", "anthropicModel",
@@ -65,7 +75,9 @@ export async function getActiveConfig() {
 // Both the popup (REVISE_PROMPT) and the shortcut/right-click (reviseInPlace)
 // paths use this, so the model-list logic stays in one place.
 export async function getFailoverConfig() {
-  const stored = await chrome.storage.local.get([...ALL_FIELDS, "openrouterWorkingModels"]);
+  const stored = await chrome.storage.local.get([
+    ...ALL_FIELDS, "openrouterWorkingModels", CROSS_PROVIDER_FALLBACK_KEY
+  ]);
   const provider = Object.hasOwn(PROVIDERS, stored.provider) ? stored.provider : DEFAULT_PROVIDER;
   const meta = PROVIDERS[provider] || PROVIDERS[DEFAULT_PROVIDER];
   const apiKeys = {
@@ -77,14 +89,21 @@ export async function getFailoverConfig() {
   const working = Array.isArray(stored.openrouterWorkingModels)
     ? stored.openrouterWorkingModels.filter((m) => m && typeof m.id === "string" && m.id.trim())
     : [];
-  let models = [activeModel];
+  const workingIds = working.map((m) => m.id);
+
+  // Backups stay INSIDE the active provider unless the user opted in. Otherwise a
+  // transient 5xx would quietly ship the source text to a provider they did not choose.
+  let backups = [];
   if (provider === "openrouter") {
-    models = [activeModel, ...working.map((m) => m.id).filter((id) => id && id !== activeModel)];
-  } else if (apiKeys.openrouter) {
-    // When Anthropic is active but an OpenRouter key exists, add the verified
-    // models as cross-provider backups (api.js detectProvider picks the right key).
-    models = [activeModel, ...working.map((m) => m.id).filter(Boolean)];
+    backups = workingIds;
+  } else if (apiKeys.openrouter && stored[CROSS_PROVIDER_FALLBACK_KEY] === true) {
+    // Anthropic active + explicit opt-in: verified OpenRouter models become
+    // cross-provider backups (api.js detectProvider picks the matching key).
+    backups = workingIds;
   }
 
-  return { provider, apiKey: apiKeys[provider], apiKeys, models: [...new Set(models.map((m) => m.trim()).filter(Boolean))] };
+  const models = [...new Set([activeModel, ...backups].map((m) => (m || "").trim()).filter(Boolean))]
+    .slice(0, MAX_BACKUP_MODELS + 1);
+
+  return { provider, apiKey: apiKeys[provider], apiKeys, models };
 }
