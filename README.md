@@ -1,115 +1,217 @@
 # Meta-Prompt Engine & Revision System 🚀
 
-This project is a modern Google Chrome extension (Manifest V3) that revises ordinary text found in web-page text fields (input/textarea) in place, turning it into **expert-grade prompts (meta-prompts)** by leveraging Claude (the Anthropic Messages API) or OpenRouter integration.
+[![Manifest V3](https://img.shields.io/badge/Chrome_Extension-Manifest_V3-4285F4?logo=googlechrome&logoColor=white)](manifest.json)
+[![macOS Companion](https://img.shields.io/badge/macOS-Apple_Silicon_Native-000000?logo=apple&logoColor=white)](macos/README.md)
+[![Tests](https://img.shields.io/badge/Offline_Checks-122%2B_Passing-success?logo=node.js&logoColor=white)](package.json)
+[![Providers](https://img.shields.io/badge/Providers-Anthropic_%7C_OpenRouter-blueviolet)](config.js)
+[![Privacy](https://img.shields.io/badge/Privacy-100%25_Local_Storage-green)](compliance.md)
+
+An intelligent, context-aware prompt enhancement engine available as both a **Google Chrome Extension (Manifest V3)** and a **standalone native macOS companion application**. 
+
+Meta-Prompt transforms raw user thoughts, drafts, and queries in real time into **expert-grade prompts** tailored for frontier LLMs. It streams the revised prompt directly into any web text field in place or native desktop windows, backed by a biophysical Spiking Neural Network (SNN) cognitive model and automated multi-model failover.
 
 ---
 
-## ✨ Features
+## 📑 Table of Contents
 
-- **In-place Revision**: Improve the text in any text field directly in place with a keyboard shortcut. The result is written in a **streaming** fashion — it appears in the field as it is generated.
-- **Undo**: If the in-place revision has overwritten the text in the field, restore the original text with `Ctrl + Shift + U` or the **"Undo last revision"** item in the right-click menu.
-- **Enhancement Modes**: In addition to the standard meta-prompt, there are **Vibe Coding** (6 strategies), **Web Research** (Boolean/dorking/academic/OSINT), and **Anti-Hallucination** (RAG, ReAct, CoN, CoK, LogiCoT, CoVe, Atomic Claim Verification, Self-Consistency, Semantic Triangulation) modes; with the "Auto" selection, the strategy is determined automatically based on the intent in the text.
-- **Smart Task Detection**: The raw text is classified as coding / analysis / email / summary / translation / explanation / planning / creative writing, and the prompt is specialized accordingly.
-- **SNN "Ana Beyin" (Main Brain) Simulation**: A biophysical spiking neural network runs before every revision; the ACh/NE/DA neuromodulator levels are folded into the prompt as a cognitive-style parameter and adapt over time through usage feedback (reward/penalty).
-- **Multi-Provider Support (Anthropic & OpenRouter)**:
-  - Direct Anthropic Messages API (Claude Sonnet, Haiku, Opus, etc.).
-  - Support for hundreds of open-source and commercial models via the OpenRouter API.
-- **Smart Error Handling and Failover**:
-  - When a model is busy or returns an error, automatic switching to the next alternative model. At most 3 backup models are tried per revision, so a failing provider cannot hang the request for minutes.
-  - Backups stay within the active provider. Sending your text to the *other* provider is opt-in, off by default, and enabled with a single checkbox in Settings.
-  - Halting needless retries on critical authorization errors such as 401/403; 90 s request / 30 s stream-silence timeouts.
-- **Quick Shortcuts**:
-  - `Ctrl + Shift + L` (Mac: `Cmd + Shift + L`) — instant in-place revision.
-  - `Ctrl + Shift + U` (Mac: `Cmd + Shift + U`) — undo the last revision.
-- **Output Control**: Choice of output language (Auto/Turkish/English) and four length tiers (Short/Medium/Long/Max).
-- **Revision History**: The last 5 revisions are stored locally using reversible obfuscation (not secure encryption); they can be deleted individually or cleared all at once. Common API key and email patterns are redacted before saving; this is best-effort and does not detect all sensitive data.
-- **Secure Storage**: Your API keys and preferences are stored entirely in local browser storage (`chrome.storage.local`); keys are sent only to their matching API provider for authentication. Source text and generated prompts are sent to the model you selected, and to backup models on that same provider if it fails. They reach a different provider only if you turn on cross-provider fallback in Settings, and reach a second model only if you turn on the consensus check.
+- [✨ Key Features](#-key-features)
+- [🧠 Architecture & Cognitive Engine](#-architecture--cognitive-engine)
+- [🎯 Enhancement Modes & Strategies](#-enhancement-modes--strategies)
+- [🖥️ Standalone macOS App](#️-standalone-macos-app)
+- [⌨️ Keyboard Shortcuts](#️-keyboard-shortcuts)
+- [📂 Project Structure](#-project-structure)
+- [🛠️ Installation & Setup](#️-installation--setup)
+  - [Google Chrome Extension](#google-chrome-extension)
+  - [macOS Desktop App](#macos-desktop-app)
+- [🧪 Offline Verification & Tests](#-offline-verification--tests)
+- [🔒 Privacy & Security Model](#-privacy--security-model)
+- [📄 References & Methodology](#-references--methodology)
+
+---
+
+## ✨ Key Features
+
+- **In-Place Live Streaming**: Type your idea into any `<input>` or `<textarea>`, trigger the shortcut, and watch the prompt stream into the field character-by-character.
+- **One-Key Undo & Snapshot Safety**: Accidental revision or unexpected output? Hit `Ctrl+Shift+U` (`Cmd+Shift+U` on macOS) or right-click to restore your original text instantly.
+- **Focus-Lock & Edit Protection**: If focus leaves the field during generation, streaming safely finishes in the background and saves to popup clipboard history. If you begin typing while a stream is running, auto-writing ceases immediately to preserve your edits.
+- **Partial Stream Resilience**: Service worker evictions never lose your generation — partial stream states are mirrored to storage every second for seamless recovery.
+- **Bilingual Smart Task Detection**: Robust ASCII-folded classification for Turkish and English. Distinguishes Coding, Analysis, Email, Summary, Translation, Explanation, Planning, and Creative Writing without tripping over false positives (e.g. "posta kodu", "barkod", "çalışma programı").
+- **Biophysical SNN Simulation ("Ana Beyin")**: Simulates a Leaky Integrate-and-Fire (LIF) network with Tsodyks-Markram dynamic synapses and neuromodulators (ACh, NE, DA). Modulator values modulate prompt cognition and adapt via reward/penalty feedback.
+- **Resilient Dual-Provider Integration**:
+  - Direct Anthropic Messages API (Claude 3.5 Sonnet, Haiku, Opus).
+  - OpenRouter API access to hundreds of open-source and commercial models.
+  - Automatic model failover (capped at 3 backup retries to prevent prolonged hangs).
+  - Cross-provider fallback is strictly opt-in and off by default.
+  - Immediate failover halt on authentication errors (401/403).
+
+---
+
+## 🧠 Architecture & Cognitive Engine
+
+```text
+┌────────────────────────────────────────────────────────┐
+│               User Trigger (Shortcut / Menu)           │
+└───────────────────────────┬────────────────────────────┘
+                            │
+              ┌─────────────▼─────────────┐
+              │   Task Intent Classifier  │  (Bilingual TR/EN Keyword Scoring)
+              └─────────────┬─────────────┘
+                            │
+              ┌─────────────▼─────────────┐
+              │   SNN "Ana Beyin" Tick    │  (LIF Neurons + ACh/NE/DA Modulators)
+              └─────────────┬─────────────┘
+                            │
+              ┌─────────────▼─────────────┐
+              │    System Prompt Builder  │  (Mode Strategy + Length Budget + Guardrails)
+              └─────────────┬─────────────┘
+                            │
+              ┌─────────────▼─────────────┐
+              │ Failover Streaming Router │  (Anthropic / OpenRouter SSE Engine)
+              └─────────────┬─────────────┘
+                            │
+       ┌────────────────────┴────────────────────┐
+       ▼                                         ▼
+┌──────────────┐                         ┌──────────────┐
+│  Chrome MV3  │                         │ macOS Native │
+│ In-Place Text│                         │ App Window   │
+└──────────────┘                         └──────────────┘
+```
+
+The system prompt follows the **Ana Beyin methodology**: it produces a prompt *for another LLM* rather than directly answering the request. It enforces strict fidelity rules: verbatim specifics (names, endpoints, values) must be preserved, while missing critical context uses standardized placeholders like `[PLACEHOLDER]` rather than hallucinated details.
+
+---
+
+## 🎯 Enhancement Modes & Strategies
+
+Select between multiple specialized prompting modes in the popup or settings:
+
+| Mode | Available Strategies | Purpose & Capabilities |
+| :--- | :--- | :--- |
+| **Standard Meta-Prompt** | Auto / Structured | General expert prompting, task-specialized role definition, chain-of-thought instructions. |
+| **Vibe Coding** | Standard, Jazz, Fractal, Emotive, Hydrological, Alchemical | Deep programming prompts, iterative verification loops, v1.0 architecture contracts, security review checklists. |
+| **Web Research** | Boolean, Dorking, Academic, OSINT | Search engine syntax, targeted domain filters, academic citation guidelines, investigation frameworks. |
+| **Anti-Hallucination** | RAG, ReAct, CoN, CoK, LogiCoT, CoVe, Atomic Claim, Self-Consistency, Semantic Triangulation | Strict factual bounding, multi-angle claim decomposition, formal reasoning, zero unverified assumptions. |
+
+---
+
+## 🖥️ Standalone macOS App
+
+In addition to the browser extension, this repository contains a standalone Apple Silicon macOS app (`dist/MetaPrompt.app`):
+
+- **Native Swift Host**: Fast, lightweight macOS interface using system windows, menus, and clipboard shortcuts.
+- **No Chrome Dependency**: Runs independently of browser sessions or node runtime installations.
+- **Connected CLI Accounts**: Can leverage local signed-in developer CLIs without needing separate API keys:
+  - **Claude Code** (`claude` CLI with Sonnet profile)
+  - **Codex** (ChatGPT developer account)
+  - **OpenCode** (Local / OpenCode account)
+- Build instructions located in [macos/README.md](macos/README.md).
+
+---
+
+## ⌨️ Keyboard Shortcuts
+
+| Shortcut | macOS | Action |
+| :--- | :--- | :--- |
+| `Ctrl + Shift + L` | `Cmd + Shift + L` | **Revise in place**: Transforms selected or focused text field |
+| `Ctrl + Shift + U` | `Cmd + Shift + U` | **Undo revision**: Restores original text prior to last enhancement |
+| `Command + ,` | `Cmd + ,` | Open Settings window (macOS app) |
 
 ---
 
 ## 📂 Project Structure
 
 ```text
-├── manifest.json          # Chrome Extension configuration file (V3)
-├── icons/                 # Extension icons (SVG source + 16/32/48/128 PNG)
-├── background.js          # Background worker (Service Worker), shortcut and menu listeners
-├── content.js             # Script that provides access to text fields on pages
-├── api.js                 # Anthropic and OpenRouter API integrations
-├── config.js              # Provider definitions and local settings management helpers
-├── popup.html / popup.js  # Quick-access and status display interface
-├── options.html / options.js # Detailed model and API key settings page
-├── prompt.js              # Revision system prompts and templates
-├── brain_network.js       # Advanced prompt optimization network logic
-├── brain_helper.js        # Helper functions
-├── package.json           # Offline check runner (npm test); no bundler, no build step
-├── verify_brain.js        # SNN validation and testing tool
-├── verify_prompt.js       # Prompt layer validation tool (npm run test:prompt)
-├── verify_runtime.mjs     # Config, failover, streaming and undo contracts
-├── compliance.md          # Compliance and standards document
-├── methodology.md         # Prompt revision methodology
-└── performance_report.md  # Performance analysis report
+├── manifest.json            # Chrome Extension Manifest V3 configuration
+├── icons/                   # High-resolution extension and app icons
+├── background.js            # Service worker, message router, stream controller
+├── content.js               # In-place page DOM accessor, undo snapshot manager
+├── api.js                   # Unified Anthropic & OpenRouter SSE client with failover
+├── config.js                # Provider schemas, model catalogs, failover constraints
+├── prompt.js                # Task detection, Ana Beyin prompt synthesis, mode engines
+├── brain_network.js         # Biophysical LIF Spiking Neural Network simulation
+├── brain_helper.js          # SNN persistence, modulator integration, synaptic reward
+├── popup.html / popup.js    # Browser action popup UI & streaming port bridge
+├── popup.css                # Extension popup layout and styling
+├── options.html / options.js# Settings page for keys, providers, and failover options
+├── options.css              # Settings layout styling
+├── theme.css                # Shared design system (warm neutral & forest-green palette)
+├── package.json             # Test runner configuration (npm test)
+├── verify_prompt.js         # 122 structural & bilingual prompt checks
+├── verify_brain.js          # SNN biophysical unit tests, benchmarks, stress tests
+├── verify_runtime.mjs       # Mock-based runtime failover, undo, & isolation tests
+├── macos/                   # Native macOS companion application
+│   ├── Main.swift           # Swift macOS app delegate & window manager
+│   ├── Accounts.swift       # Connected CLI accounts bridge (Claude, Codex, OpenCode)
+│   ├── desktop.js           # Desktop environment adapter
+│   ├── build.py             # Packaging & ad-hoc code signing script
+│   ├── verify_desktop.mjs   # Native desktop bridge test suite
+│   └── README.md            # macOS app documentation and build manual
+├── methodology.md           # Formal Ana Beyin prompt architecture specification
+├── compliance.md            # Privacy and data handling disclosures
+├── performance_report.md    # SNN latency and throughput benchmark results
+└── CLAUDE.md                # Development guide and developer contracts
 ```
 
 ---
 
-## 🛠️ Installation and Loading
+## 🛠️ Installation & Setup
 
-Follow these steps to load the extension into your browser locally:
+### Google Chrome Extension
 
-1. Clone or download this repository.
-2. Open your Google Chrome browser and navigate to `chrome://extensions/`.
-3. Enable the **"Developer mode"** option in the top-right corner.
-4. Click the **"Load unpacked"** button in the top left.
-5. Select this project's folder (the root directory containing the files) to load it.
+1. Clone or download this repository to your computer:
+   ```sh
+   git clone https://github.com/gturkmenlabs/Meta-prompt-google-extension.git
+   ```
+2. Open Google Chrome and navigate to `chrome://extensions/`.
+3. Enable **Developer mode** in the top-right corner.
+4. Click **Load unpacked** in the top-left corner.
+5. Select the repository root folder.
+6. Click the extension icon to open Settings and configure your Anthropic or OpenRouter API key.
+
+### macOS Desktop App
+
+Requires macOS 13 or newer on Apple Silicon (M1/M2/M3/M4):
+
+1. Ensure Xcode Command Line Tools are installed: `xcode-select --install`
+2. Build the app bundle:
+   ```sh
+   npm run build:macos
+   ```
+3. The built application will be ready at `dist/MetaPrompt.app`. Double-click or copy to `/Applications`.
 
 ---
 
-## ⚙️ Configuration and Usage
+## 🧪 Offline Verification & Tests
 
-1. Click the **Meta-Prompt** icon in your browser's extension bar, or go to the **Options** page.
-2. Select your preferred provider (Anthropic or OpenRouter).
-3. Enter your API Key and configure the models you want to use.
-4. After typing your text into a text field on any web page:
-   - Select the text and right-click to choose the **"Revise with Meta-Prompt"** option, or
-   - Use the `Ctrl + Shift + L` (`Cmd + Shift + L`) shortcut.
-5. If the result is not what you expected, you can restore the original text with `Ctrl + Shift + U` (`Cmd + Shift + U`).
-
-
-## Reliability and verification
-
-In-place revisions keep the original target even if focus moves. If you edit the
-field during generation, automatic writing stops and the completed result is
-available in the popup. Interrupted streams retain an undo snapshot. Repeated
-in-place triggers on a busy tab are ignored until the current operation finishes.
-A stream that ends without its completion marker is reported as incomplete.
-
-Run the offline checks (no API keys, network requests, or build step required):
+All tests run completely **offline** without requiring API credentials, network access, or build steps:
 
 ```sh
 npm test
 ```
 
-That runs the prompt layer (122 structural checks, including Turkish task
-detection), the brain simulation, the runtime contracts, and the macOS desktop
-bridge. Individual suites are available as `npm run test:prompt`, `test:brain`,
-`test:runtime` and `test:desktop`.
+This runs the comprehensive verification suite:
+- **`npm run test:prompt`**: 122 prompt structure tests, bilingual English & Turkish task classifiers, token boundaries, and anti-injection sanitization.
+- **`npm run test:brain`**: SNN neuron membrane dynamics, Tsodyks-Markram plasticity, STDP pruning, serialization round-trips, and 10,000-step latency benchmarks.
+- **`npm run test:runtime`**: API key isolation, failover limits, SSE stream recovery, and target element locking.
+- **`npm run test:desktop`**: Native Swift/JS message bridges, Unicode clipboard buffers, and stream cancellation.
 
-After changes, reload the unpacked extension and refresh the target page. For a
-manual smoke test, revise a textarea, switch focus while generation is running,
-then undo. Also check popup generation, copy, write to page, and provider switching
-in Settings. Restricted Chrome pages and some custom editors cannot be edited;
-use Copy in those cases. Live provider calls require your configured credentials.
+---
 
-## Interface styling
+## 🔒 Privacy & Security Model
 
-`popup.css` and `options.css` define screen-specific layout. `theme.css` holds the
-shared warm neutral and forest-green palette, typography, focus states, mode cards,
-and responsive settings layout. Fonts use the system stack; no external font
-requests are needed. Reload the extension after updating styles.
+- **Zero External Telemetry**: The extension contains no third-party tracking, analytics, or remote logging.
+- **100% Local Storage**: Settings, preferences, and neural synaptic weights are stored exclusively in Chrome's `chrome.storage.local` (or `state.json` on macOS).
+- **Direct API Connections**: Prompts are transmitted strictly between your device and your chosen AI provider (Anthropic or OpenRouter).
+- **Cross-Provider Protection**: Your text is never routed to an alternative provider during failover unless you explicitly opt in via Settings.
+- **Local History Redaction**: Reversible obfuscation is applied to recent history, with best-effort masking of common API keys and sensitive tokens.
 
-## Standalone macOS app
+---
 
-An additional Apple Silicon desktop app is available at `dist/MetaPrompt.app`.
-It uses the same prompt engine with native windows, menus, clipboard integration,
-and separate local settings. See [macOS instructions](macos/README.md).
-Build it with `python3 macos/build.py`; Chrome is not required to run it.
+## 📄 References & Methodology
+
+- [CLAUDE.md](CLAUDE.md): Internal developer guidelines and cross-file contracts.
+- [methodology.md](methodology.md): The full Ana Beyin prompt revision design document.
+- [compliance.md](compliance.md): Detailed compliance and privacy disclosures.
+- [performance_report.md](performance_report.md): Computational benchmarks for the SNN engine.
+- [macos/README.md](macos/README.md): macOS app architecture and CLI bridge manual.
+
