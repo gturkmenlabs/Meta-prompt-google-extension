@@ -1,5 +1,9 @@
-import { PROVIDERS, DEFAULT_PROVIDER, getStoredConfig, CROSS_PROVIDER_FALLBACK_KEY, MAX_BACKUP_MODELS } from "./config.js";
+import {
+  PROVIDERS, DEFAULT_PROVIDER, getStoredConfig, CROSS_PROVIDER_FALLBACK_KEY, MAX_BACKUP_MODELS,
+  TYPESAFE_KEY_FIELD, TYPESAFE_ENABLED_KEY, TYPESAFE_MIN_CONFIDENCE_KEY
+} from "./config.js";
 import { fetchOpenRouterModels, revise } from "./api.js";
+import { testTypesafeKey, DEFAULT_MIN_CONFIDENCE, MAX_CLASSIFY_CHARS } from "./typesafe.js";
 
 document.addEventListener("DOMContentLoaded", async () => {
   const providerSelect = document.getElementById("provider");
@@ -19,6 +23,13 @@ document.addEventListener("DOMContentLoaded", async () => {
   const showKeyBtn     = document.getElementById("showKeyBtn");
   const crossProviderToggle = document.getElementById("crossProviderToggle");
   const maxBackupCount      = document.getElementById("maxBackupCount");
+  const typesafeToggle        = document.getElementById("typesafeToggle");
+  const typesafeKeyInput      = document.getElementById("typesafeKey");
+  const showTypesafeKeyBtn    = document.getElementById("showTypesafeKeyBtn");
+  const typesafeMinConfidence = document.getElementById("typesafeMinConfidence");
+  const typesafeTestBtn       = document.getElementById("typesafeTestBtn");
+  const typesafeTestResult    = document.getElementById("typesafeTestResult");
+  const typesafeMaxChars      = document.getElementById("typesafeMaxChars");
 
   // ——— Cross-provider fallback (opt-in) ———
   // Persisted on change, like the popup toggles, so it applies to the shortcut
@@ -30,6 +41,69 @@ document.addEventListener("DOMContentLoaded", async () => {
     crossProviderToggle.addEventListener("change", () =>
       chrome.storage.local.set({ [CROSS_PROVIDER_FALLBACK_KEY]: crossProviderToggle.checked })
     );
+  }
+
+  // ——— TypeSafe task classification (opt-in) ———
+  // The toggle and threshold persist on change, like the cross-provider toggle,
+  // so the shortcut and context-menu paths pick them up without a Save. The key
+  // itself goes through Save with the provider keys.
+  if (typesafeMaxChars) typesafeMaxChars.textContent = String(MAX_CLASSIFY_CHARS);
+  const typesafeStored = await chrome.storage.local.get([
+    TYPESAFE_KEY_FIELD, TYPESAFE_ENABLED_KEY, TYPESAFE_MIN_CONFIDENCE_KEY
+  ]);
+  if (typesafeKeyInput) typesafeKeyInput.value = typesafeStored[TYPESAFE_KEY_FIELD] || "";
+  if (typesafeToggle) {
+    typesafeToggle.checked = typesafeStored[TYPESAFE_ENABLED_KEY] === true;
+    typesafeToggle.addEventListener("change", () =>
+      chrome.storage.local.set({ [TYPESAFE_ENABLED_KEY]: typesafeToggle.checked })
+    );
+  }
+  if (typesafeMinConfidence) {
+    const savedConfidence = Number(typesafeStored[TYPESAFE_MIN_CONFIDENCE_KEY]);
+    typesafeMinConfidence.value = String(
+      Number.isFinite(savedConfidence) && savedConfidence > 0 && savedConfidence <= 1
+        ? savedConfidence
+        : DEFAULT_MIN_CONFIDENCE
+    );
+    typesafeMinConfidence.addEventListener("change", () => {
+      const value = Number(typesafeMinConfidence.value);
+      // An out-of-range threshold would either disable the feature outright or
+      // accept every coin-flip answer; snap back to the default instead.
+      const safe = Number.isFinite(value) && value > 0 && value <= 1 ? value : DEFAULT_MIN_CONFIDENCE;
+      typesafeMinConfidence.value = String(safe);
+      chrome.storage.local.set({ [TYPESAFE_MIN_CONFIDENCE_KEY]: safe });
+    });
+  }
+  if (showTypesafeKeyBtn && typesafeKeyInput) {
+    showTypesafeKeyBtn.addEventListener("click", () => {
+      const isPassword = typesafeKeyInput.type === "password";
+      typesafeKeyInput.type = isPassword ? "text" : "password";
+      showTypesafeKeyBtn.textContent = isPassword ? "Hide" : "Show";
+    });
+  }
+  if (typesafeTestBtn) {
+    typesafeTestBtn.addEventListener("click", async () => {
+      const key = typesafeKeyInput.value.trim();
+      const original = typesafeTestBtn.textContent;
+      typesafeTestBtn.disabled    = true;
+      typesafeTestBtn.textContent = "Testing…";
+      typesafeTestResult.style.color = "";
+      typesafeTestResult.textContent = "Asking TypeSafe to classify a sample task…";
+      try {
+        const answer = await testTypesafeKey(key);
+        const confidence = typeof answer.confidence === "number"
+          ? ` (confidence ${answer.confidence.toFixed(2)})`
+          : "";
+        typesafeTestResult.textContent = `✓ TypeSafe answered "${answer.value}"${confidence}.`;
+        typesafeTestResult.style.color = "var(--add, #5FE0A0)";
+      } catch (error) {
+        typesafeTestResult.textContent = `✗ ${error.message}`;
+        typesafeTestResult.style.color = "var(--del, #FF8A92)";
+      } finally {
+        typesafeTestBtn.disabled    = false;
+        typesafeTestBtn.textContent = original;
+      }
+    });
   }
 
   // ——— Provider segmented buttons ———
@@ -330,6 +404,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       anthropicModel:  state.anthropicModel,
       openrouterKey:   state.openrouterKey,
       openrouterModel: state.openrouterModel,
+      [TYPESAFE_KEY_FIELD]: typesafeKeyInput ? typesafeKeyInput.value.trim() : "",
     });
 
     saved.textContent = "Saved ✓";

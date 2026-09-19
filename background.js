@@ -3,7 +3,8 @@
 //  - "revise in place": reads the active text box, revises it via the API, and writes it back.
 
 import { reviseWithFailover, reviseStreamWithFailover } from "./api.js";
-import { getFailoverConfig } from "./config.js";
+import { getFailoverConfig, getTypesafeConfig } from "./config.js";
+import { classifyTaskType } from "./typesafe.js";
 import { buildSystemPrompt, buildUserMessage, buildConsensusJudgeMessages, maxTokensFor, detectTaskType, resolveAutoStrategy } from "./prompt.js";
 import { runBrainSimulation } from "./brain_helper.js";
 
@@ -15,6 +16,25 @@ const activeRevisions = new Set();
 // service-worker eviction cannot silently discard a revision in progress.
 const PARTIAL_SAVE_MS = 1000;
 const badgeTimers = new Map();
+
+// Resolves the standard-mode task type through TypeSafe when the user enabled it,
+// so the prompt brain can pick its modules from a judgment instead of keyword
+// hits. Returns null whenever the keyword detector should stay in charge: the
+// non-standard modes (they label the SNN from their strategy), the feature off,
+// low confidence, or any failure. Both revision paths treat null as "use
+// detectTaskType", so this can never block a revision.
+async function resolveStandardTaskType(mode, rawText) {
+  if (mode !== "standard") return null;
+  try {
+    const { apiKey, enabled, minConfidence } = await getTypesafeConfig();
+    if (!enabled) return null;
+    const judged = await classifyTaskType({ apiKey, rawText, minConfidence });
+    return judged ? judged.taskType : null;
+  } catch (error) {
+    console.warn("TypeSafe task classification skipped:", error);
+    return null;
+  }
+}
 
 chrome.runtime.onInstalled.addListener(() => {
   // Clear existing menus (prevents duplicate id errors).
@@ -180,6 +200,8 @@ async function reviseInPlace(tab, selectionText = "") {
     const researchStrategy  = resolveAutoStrategy("research",   prefs.researchStrategy  || "auto", text);
     const antihalluStrategy = resolveAutoStrategy("antihallu",  prefs.antihalluStrategy || "auto", text);
 
+    const typesafeTaskType = await resolveStandardTaskType(mode, text);
+
     // 3) Run biophysical SNN simulation tick
     let snnValues = null;
     try {
@@ -189,7 +211,7 @@ async function reviseInPlace(tab, selectionText = "") {
           ? `research_${researchStrategy || "comprehensive"}`
           : mode === "antihallu"
             ? `antihallu_${antihalluStrategy || "ensemble"}`
-            : detectTaskType(text);
+            : (typesafeTaskType || detectTaskType(text));
       snnValues = await runBrainSimulation(taskType);
     } catch (snnError) {
       console.warn("SNN simulation failed, using static fallback:", snnError);
@@ -226,7 +248,7 @@ async function reviseInPlace(tab, selectionText = "") {
       apiKey,
       apiKeys,
       models,
-      system: buildSystemPrompt(language, text, snnValues, mode, vibeStrategy, researchStrategy, antihalluStrategy, length),
+      system: buildSystemPrompt(language, text, snnValues, mode, vibeStrategy, researchStrategy, antihalluStrategy, length, typesafeTaskType),
       userText: buildUserMessage(text, { language, length, mode, vibeStrategy, researchStrategy, antihalluStrategy }),
       maxTokens: maxTokensFor(length),
       onDelta: (chunk) => {
@@ -321,6 +343,7 @@ async function prepareRevision(message) {
   const antihalluStrategy = resolveAutoStrategy("antihallu",  message.antihalluStrategy || "auto", rawText);
 
   const { provider, apiKeys, models } = await getFailoverConfig();
+  const typesafeTaskType = await resolveStandardTaskType(mode, rawText);
 
   let snnValues = null;
   try {
@@ -330,7 +353,7 @@ async function prepareRevision(message) {
         ? `research_${researchStrategy || "comprehensive"}`
         : mode === "antihallu"
           ? `antihallu_${antihalluStrategy || "ensemble"}`
-          : detectTaskType(rawText);
+          : (typesafeTaskType || detectTaskType(rawText));
     snnValues = await runBrainSimulation(taskType);
   } catch (snnError) {
     console.warn("Background SNN simulation failed:", snnError);
@@ -347,7 +370,7 @@ async function prepareRevision(message) {
     models,
     snnValues,
     resolvedStrategy,
-    system: buildSystemPrompt(language, rawText, snnValues, mode, vibeStrategy, researchStrategy, antihalluStrategy, length),
+    system: buildSystemPrompt(language, rawText, snnValues, mode, vibeStrategy, researchStrategy, antihalluStrategy, length, typesafeTaskType),
     userText: buildUserMessage(rawText, { language, length, mode, vibeStrategy, researchStrategy, antihalluStrategy }),
     maxTokens: maxTokensFor(length)
   };

@@ -76,4 +76,63 @@ send({type:'GET_EDITABLE_TEXT',captureTarget:true});
 second.value='user edit';
 assert.equal(send({type:'STREAM_EDITABLE_TEXT',text:'replacement'}).ok,false);
 assert.equal(second.value,'user edit');
-console.log('Runtime checks passed: configuration, key isolation, fragmented UTF-8 streams, premature EOF, upstream errors, failover, target locking, partial undo, user edits.');
+// ——— TypeSafe task classifier ———
+// The classifier is optional and must fail open: every rejection path below has
+// to leave the caller with null, which background.js reads as "use keywords".
+const {
+  classifyTaskType, readChoiceAnswer, buildClassifyRequest, MAX_CLASSIFY_CHARS, DEFAULT_MIN_CONFIDENCE
+} = await import('./typesafe.js');
+const { getTypesafeConfig } = await import('./config.js');
+
+// Opt-in: a stored key alone must not start shipping text to a third service.
+stored = { typesafeKey: 'apikey_x' };
+assert.equal((await getTypesafeConfig()).enabled, false, 'TypeSafe is off without the explicit opt-in');
+stored = { typesafeEnabled: true };
+assert.equal((await getTypesafeConfig()).enabled, false, 'TypeSafe stays off without a key');
+stored = { typesafeKey: 'apikey_x', typesafeEnabled: true };
+assert.equal((await getTypesafeConfig()).enabled, true);
+assert.equal((await getTypesafeConfig()).minConfidence, DEFAULT_MIN_CONFIDENCE);
+stored = { ...stored, typesafeMinConfidence: 7 };
+assert.equal((await getTypesafeConfig()).minConfidence, DEFAULT_MIN_CONFIDENCE, 'Out-of-range threshold falls back');
+
+// Only the opening of the text leaves the browser.
+const longText = 'x'.repeat(MAX_CLASSIFY_CHARS + 500);
+assert.equal(buildClassifyRequest(longText).state.raw_text.length, MAX_CLASSIFY_CHARS, 'Classifier text is capped');
+
+// The answer reader accepts the shapes the API may nest a Choice in.
+assert.equal(readChoiceAnswer({answers:{task_type:{value:'coding',confidence:0.9}}}).value, 'coding');
+assert.equal(readChoiceAnswer({answers:[{id:'task_type',answer:'email'}]}).value, 'email');
+assert.equal(readChoiceAnswer({task_type:'summary'}).value, 'summary');
+assert.equal(readChoiceAnswer({answers:{task_type:{value:'coding',probabilities:{coding:0.8}}}}).confidence, 0.8,
+  'Confidence falls back to the winning probability');
+assert.equal(readChoiceAnswer(null), null);
+
+const ok = (body) => async () => new Response(JSON.stringify(body), {status:200});
+globalThis.fetch = ok({answers:{task_type:{value:'planning',confidence:0.91}}});
+assert.deepEqual(await classifyTaskType({apiKey:'k', rawText:'haftalik spor programi hazirla'}),
+  {taskType:'planning', confidence:0.91});
+// Every unusable answer degrades to null rather than throwing.
+assert.equal(await classifyTaskType({apiKey:'', rawText:'hello'}), null, 'No key -> no call');
+assert.equal(await classifyTaskType({apiKey:'k', rawText:'   '}), null, 'Blank text -> no call');
+globalThis.fetch = ok({answers:{task_type:{value:'coding',confidence:0.2}}});
+assert.equal(await classifyTaskType({apiKey:'k', rawText:'hello', minConfidence:0.55}), null, 'Low confidence is discarded');
+globalThis.fetch = ok({answers:{task_type:{value:'not_a_task_type',confidence:0.99}}});
+assert.equal(await classifyTaskType({apiKey:'k', rawText:'hello'}), null, 'Unknown task type is discarded');
+globalThis.fetch = async () => new Response('nope', {status:500});
+assert.equal(await classifyTaskType({apiKey:'k', rawText:'hello'}), null, 'HTTP error is swallowed');
+globalThis.fetch = async () => { throw new Error('offline'); };
+assert.equal(await classifyTaskType({apiKey:'k', rawText:'hello'}), null, 'Network failure is swallowed');
+
+// An override only wins when it names a real module; anything else keeps keywords.
+const { buildSystemPrompt } = await import('./prompt.js');
+const creative = buildSystemPrompt('auto', 'write a function that sorts a list', null,
+  'standard', 'jazz', 'comprehensive', 'ensemble', 'orta', 'creative');
+const coding = buildSystemPrompt('auto', 'write a function that sorts a list', null,
+  'standard', 'jazz', 'comprehensive', 'ensemble', 'orta', null);
+assert.notEqual(creative, coding, 'A valid override changes the assembled prompt');
+assert.equal(
+  buildSystemPrompt('auto', 'write a function that sorts a list', null,
+    'standard', 'jazz', 'comprehensive', 'ensemble', 'orta', 'bogus'),
+  coding, 'An unknown override is ignored');
+
+console.log('Runtime checks passed: configuration, key isolation, fragmented UTF-8 streams, premature EOF, upstream errors, failover, target locking, partial undo, user edits, TypeSafe opt-in and fail-open classification.');

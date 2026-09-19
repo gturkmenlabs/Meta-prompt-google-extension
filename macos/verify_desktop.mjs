@@ -51,4 +51,26 @@ const controller = new AbortController();
 const interrupted = await context.fetch('https://openrouter.ai/api/v1/models', {signal:controller.signal});
 controller.abort();
 await assert.rejects(interrupted.text(), {name:'AbortError'});
-console.log('Desktop bridge checks passed: persistent API contract, callbacks, ports, Unicode clipboard, streamed bytes and cancellation.');
+
+// The macOS build copies an explicit file list, so a module imported by the
+// shared engine but missing from that list only fails once the app is launched.
+// Check the two against each other here instead.
+{
+  const { readFileSync, readdirSync } = await import('node:fs');
+  const root = new URL('../', import.meta.url);
+  const buildList = new Set(
+    (readFileSync(new URL('build.py', import.meta.url), 'utf8')
+      .match(/for name in \[([\s\S]*?)\]:/)[1]
+      .match(/"([^"]+\.js)"/g) || []).map((m) => m.slice(1, -1))
+  );
+  for (const file of buildList) {
+    const source = readFileSync(new URL(file, root), 'utf8');
+    for (const [, spec] of source.matchAll(/from\s+"\.\/([\w.-]+\.js)"/g)) {
+      if (!buildList.has(spec)) {
+        throw new Error(`${file} imports ./${spec}, which macos/build.py does not copy.`);
+      }
+    }
+  }
+}
+
+console.log('Desktop bridge checks passed: persistent API contract, callbacks, ports, Unicode clipboard, streamed bytes, cancellation and build file list.');

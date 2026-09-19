@@ -9,7 +9,8 @@
   ],
   "host_permissions": [
     "https://api.anthropic.com/*",
-    "https://openrouter.ai/*"
+    "https://openrouter.ai/*",
+    "https://api.typesafe.ai/*"
   ],
   "background": {
     "service_worker": "background.js",

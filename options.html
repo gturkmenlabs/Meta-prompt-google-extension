@@ -119,6 +119,61 @@
 
       <div class="ms-div"></div>
 
+      <!-- TypeSafe: task classification for the prompt brain -->
+      <div class="ms-field">
+        <label for="typesafeToggle"
+               style="display:flex; align-items:flex-start; gap:8px; cursor:pointer;">
+          <input type="checkbox" id="typesafeToggle" style="margin:3px 0 0 0;">
+          <span>
+            <strong>Classify the task with TypeSafe</strong>
+            <span class="ms-hint" style="display:block; margin-top:2px;">
+              Off by default. The prompt brain normally guesses your task type from
+              keywords. When on, the first <span id="typesafeMaxChars">2000</span>
+              characters of your text are sent to TypeSafe, whose answer picks the
+              prompt modules instead. Low-confidence or failed answers fall back to
+              the keyword guess, so revisions never break.
+            </span>
+          </span>
+        </label>
+      </div>
+
+      <div class="ms-field">
+        <label class="ms-label" for="typesafeKey">TypeSafe API Key</label>
+        <div class="ms-input-wrap">
+          <input class="ms-input mono" id="typesafeKey" type="password"
+            placeholder="apikey_…" autocomplete="off" spellcheck="false">
+          <button class="ms-show-btn" id="showTypesafeKeyBtn" type="button">Show</button>
+        </div>
+        <div class="ms-hint" style="color:var(--faint); font-size:11px; margin-top:2px;">
+          Stored as plain text in this browser, like your provider key.
+        </div>
+      </div>
+
+      <div class="ms-field">
+        <label class="ms-label" for="typesafeMinConfidence">Minimum confidence</label>
+        <div class="ms-input-wrap" style="padding-right:0">
+          <input class="ms-input" id="typesafeMinConfidence" type="number"
+            min="0.1" max="1" step="0.05" style="padding-right:12px">
+        </div>
+        <div class="ms-hint">
+          Below this, the keyword guess is kept. Raise it if TypeSafe picks the
+          wrong task type; lower it if it rarely takes over.
+        </div>
+      </div>
+
+      <div class="ms-field">
+        <button class="ms-btn ghost" id="typesafeTestBtn" type="button">
+          <svg viewBox="0 0 24 24" width="15" height="15" fill="none">
+            <path d="M5 12h13M12 6l6 6-6 6" stroke="currentColor" stroke-width="1.8"
+              stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+          Test TypeSafe
+        </button>
+        <div class="ms-hint" id="typesafeTestResult" role="status" aria-live="polite"></div>
+      </div>
+
+      <div class="ms-div"></div>
+
       <!-- Test connection -->
       <div class="ms-field">
         <button class="ms-btn ghost" id="testBtn" type="button">
