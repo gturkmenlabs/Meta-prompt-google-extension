@@ -83,6 +83,8 @@ const {
   classifyTaskType, readChoiceAnswer, buildClassifyRequest, MAX_CLASSIFY_CHARS, DEFAULT_MIN_CONFIDENCE
 } = await import('./typesafe.js');
 const { getTypesafeConfig } = await import('./config.js');
+const { TYPESAFE_API_URL } = await import('./typesafe.js');
+assert.equal(TYPESAFE_API_URL, 'https://api.typesafe.ai/v1/systemone', 'System One endpoint per the official SDK');
 
 // Opt-in: a stored key alone must not start shipping text to a third service.
 stored = { typesafeKey: 'apikey_x' };
@@ -97,26 +99,34 @@ assert.equal((await getTypesafeConfig()).minConfidence, DEFAULT_MIN_CONFIDENCE, 
 
 // Only the opening of the text leaves the browser.
 const longText = 'x'.repeat(MAX_CLASSIFY_CHARS + 500);
-assert.equal(buildClassifyRequest(longText).state.raw_text.length, MAX_CLASSIFY_CHARS, 'Classifier text is capped');
+const request = buildClassifyRequest(longText);
+assert.equal(request.state.raw_text.length, MAX_CLASSIFY_CHARS, 'Classifier text is capped');
+// The SDK types a question map keyed by name, not a list; an array here is the
+// shape that got a 404-shaped rejection the first time round.
+assert.equal(Array.isArray(request.questions), false, 'questions is a map, not a list');
+assert.equal(request.questions.task_type.type, 'choice');
+assert.equal(Array.isArray(request.questions.task_type.criteria), false, 'criteria is a label map');
+assert.equal('model' in request, false, 'No model override: the account default applies');
 
-// The answer reader accepts the shapes the API may nest a Choice in.
-assert.equal(readChoiceAnswer({answers:{task_type:{value:'coding',confidence:0.9}}}).value, 'coding');
-assert.equal(readChoiceAnswer({answers:[{id:'task_type',answer:'email'}]}).value, 'email');
-assert.equal(readChoiceAnswer({task_type:'summary'}).value, 'summary');
-assert.equal(readChoiceAnswer({answers:{task_type:{value:'coding',probabilities:{coding:0.8}}}}).confidence, 0.8,
+// Answers come back under answers.<name> with the label in `choice`.
+assert.equal(readChoiceAnswer({answers:{task_type:{type:'choice',choice:'coding',confidence:0.9}}}).value, 'coding');
+assert.equal(
+  readChoiceAnswer({answers:{task_type:{type:'choice',choice:'coding',probabilities:{coding:0.8}}}}).confidence, 0.8,
   'Confidence falls back to the winning probability');
+assert.equal(readChoiceAnswer({answers:{other:{choice:'coding'}}}), null, 'A different question id is not read');
+assert.equal(readChoiceAnswer({answers:{task_type:{}}}), null);
 assert.equal(readChoiceAnswer(null), null);
 
 const ok = (body) => async () => new Response(JSON.stringify(body), {status:200});
-globalThis.fetch = ok({answers:{task_type:{value:'planning',confidence:0.91}}});
+globalThis.fetch = ok({answers:{task_type:{type:'choice',choice:'planning',confidence:0.91}}});
 assert.deepEqual(await classifyTaskType({apiKey:'k', rawText:'haftalik spor programi hazirla'}),
   {taskType:'planning', confidence:0.91});
 // Every unusable answer degrades to null rather than throwing.
 assert.equal(await classifyTaskType({apiKey:'', rawText:'hello'}), null, 'No key -> no call');
 assert.equal(await classifyTaskType({apiKey:'k', rawText:'   '}), null, 'Blank text -> no call');
-globalThis.fetch = ok({answers:{task_type:{value:'coding',confidence:0.2}}});
+globalThis.fetch = ok({answers:{task_type:{type:'choice',choice:'coding',confidence:0.2}}});
 assert.equal(await classifyTaskType({apiKey:'k', rawText:'hello', minConfidence:0.55}), null, 'Low confidence is discarded');
-globalThis.fetch = ok({answers:{task_type:{value:'not_a_task_type',confidence:0.99}}});
+globalThis.fetch = ok({answers:{task_type:{type:'choice',choice:'not_a_task_type',confidence:0.99}}});
 assert.equal(await classifyTaskType({apiKey:'k', rawText:'hello'}), null, 'Unknown task type is discarded');
 globalThis.fetch = async () => new Response('nope', {status:500});
 assert.equal(await classifyTaskType({apiKey:'k', rawText:'hello'}), null, 'HTTP error is swallowed');
