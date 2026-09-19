@@ -128,6 +128,14 @@ globalThis.fetch = ok({answers:{task_type:{type:'choice',choice:'coding',confide
 assert.equal(await classifyTaskType({apiKey:'k', rawText:'hello', minConfidence:0.55}), null, 'Low confidence is discarded');
 globalThis.fetch = ok({answers:{task_type:{type:'choice',choice:'not_a_task_type',confidence:0.99}}});
 assert.equal(await classifyTaskType({apiKey:'k', rawText:'hello'}), null, 'Unknown task type is discarded');
+// The failing URL belongs in the message: a 404 is nearly always a stale copy
+// of typesafe.js on an older path, and this is where the user sees which.
+{
+  const { testTypesafeKey } = await import('./typesafe.js');
+  globalThis.fetch = async () => new Response('nope', {status:404});
+  await assert.rejects(testTypesafeKey('k'), (e) => e.message.includes(TYPESAFE_API_URL),
+    'The settings test names the URL it called');
+}
 globalThis.fetch = async () => new Response('nope', {status:500});
 assert.equal(await classifyTaskType({apiKey:'k', rawText:'hello'}), null, 'HTTP error is swallowed');
 globalThis.fetch = async () => { throw new Error('offline'); };

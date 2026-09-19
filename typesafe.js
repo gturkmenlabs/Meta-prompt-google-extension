@@ -112,7 +112,7 @@ export async function classifyTaskType({ apiKey, rawText, minConfidence = DEFAUL
       signal: controller.signal
     });
     if (!response.ok) {
-      console.warn(`TypeSafe classification failed: HTTP ${response.status}`);
+      console.warn(`TypeSafe classification failed: HTTP ${response.status} from ${TYPESAFE_API_URL}`);
       return null;
     }
     const answer = readChoiceAnswer(await response.json());
@@ -143,10 +143,13 @@ export async function testTypesafeKey(apiKey) {
     body: JSON.stringify(buildClassifyRequest("write a python script that reads a csv"))
   });
   if (response.status === 401 || response.status === 403) {
-    throw new Error(`Key rejected (HTTP ${response.status}).`);
+    throw new Error(`Key rejected (HTTP ${response.status}) by ${TYPESAFE_API_URL}`);
   }
   if (!response.ok) {
-    throw new Error(`HTTP ${response.status} from TypeSafe.`);
+    // The URL is part of the message on purpose: a 404 here is almost always a
+    // stale copy of this file still pointing at an older path, and the message
+    // is the only place the user sees which URL was actually called.
+    throw new Error(`HTTP ${response.status} from ${TYPESAFE_API_URL}`);
   }
   const answer = readChoiceAnswer(await response.json());
   if (!answer) throw new Error("Connected, but the response had no usable answer.");
