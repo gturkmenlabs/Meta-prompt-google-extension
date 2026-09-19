@@ -2,11 +2,12 @@
 
 [![Manifest V3](https://img.shields.io/badge/Chrome_Extension-Manifest_V3-4285F4?logo=googlechrome&logoColor=white)](manifest.json)
 [![macOS Companion](https://img.shields.io/badge/macOS-Apple_Silicon_Native-000000?logo=apple&logoColor=white)](macos/README.md)
+[![Windows Companion](https://img.shields.io/badge/Windows-WebView2_Native-0078D4?logo=windows&logoColor=white)](windows/README.md)
 [![Tests](https://img.shields.io/badge/Offline_Checks-122%2B_Passing-success?logo=node.js&logoColor=white)](package.json)
 [![Providers](https://img.shields.io/badge/Providers-Anthropic_%7C_OpenRouter-blueviolet)](config.js)
 [![Privacy](https://img.shields.io/badge/Privacy-100%25_Local_Storage-green)](compliance.md)
 
-An intelligent, context-aware prompt enhancement engine available as both a **Google Chrome Extension (Manifest V3)** and a **standalone native macOS companion application**. 
+An intelligent, context-aware prompt enhancement engine available as a **Google Chrome Extension (Manifest V3)** and as standalone native **macOS** and **Windows** companion applications. 
 
 Meta-Prompt transforms raw user thoughts, drafts, and queries in real time into **expert-grade prompts** tailored for frontier LLMs. It streams the revised prompt directly into any web text field in place or native desktop windows, backed by a biophysical Spiking Neural Network (SNN) cognitive model and automated multi-model failover.
 
@@ -17,12 +18,13 @@ Meta-Prompt transforms raw user thoughts, drafts, and queries in real time into 
 - [✨ Key Features](#-key-features)
 - [🧠 Architecture & Cognitive Engine](#-architecture--cognitive-engine)
 - [🎯 Enhancement Modes & Strategies](#-enhancement-modes--strategies)
-- [🖥️ Standalone macOS App](#️-standalone-macos-app)
+- [🖥️ Standalone Desktop Apps](#️-standalone-desktop-apps)
 - [⌨️ Keyboard Shortcuts](#️-keyboard-shortcuts)
 - [📂 Project Structure](#-project-structure)
 - [🛠️ Installation & Setup](#️-installation--setup)
   - [Google Chrome Extension](#google-chrome-extension)
   - [macOS Desktop App](#macos-desktop-app)
+  - [Windows Desktop App](#windows-desktop-app)
 - [🧪 Offline Verification & Tests](#-offline-verification--tests)
 - [🔒 Privacy & Security Model](#-privacy--security-model)
 - [📄 References & Methodology](#-references--methodology)
@@ -94,17 +96,18 @@ Select between multiple specialized prompting modes in the popup or settings:
 
 ---
 
-## 🖥️ Standalone macOS App
+## 🖥️ Standalone Desktop Apps
 
-In addition to the browser extension, this repository contains a standalone Apple Silicon macOS app (`dist/MetaPrompt.app`):
+In addition to the browser extension, this repository contains two native apps built from the same prompt engine — an Apple Silicon macOS app (`dist/MetaPrompt.app`) and a Windows app (`dist/MetaPrompt-Windows/MetaPrompt.exe`):
 
-- **Native Swift Host**: Fast, lightweight macOS interface using system windows, menus, and clipboard shortcuts.
+- **Native Hosts**: Swift + WKWebView on macOS, C# + WebView2 on Windows, both using system windows and clipboard shortcuts.
 - **No Chrome Dependency**: Runs independently of browser sessions or node runtime installations.
+- **Shared Bridge Contract**: Both hosts answer the same actions and stream results identically, so the engine, interface and settings behave the same on either platform.
 - **Connected CLI Accounts**: Can leverage local signed-in developer CLIs without needing separate API keys:
   - **Claude Code** (`claude` CLI with Sonnet profile)
   - **Codex** (ChatGPT developer account)
   - **OpenCode** (Local / OpenCode account)
-- Build instructions located in [macos/README.md](macos/README.md).
+- Build instructions in [macos/README.md](macos/README.md) and [windows/README.md](windows/README.md).
 
 ---
 
@@ -142,10 +145,19 @@ In addition to the browser extension, this repository contains a standalone Appl
 ├── macos/                   # Native macOS companion application
 │   ├── Main.swift           # Swift macOS app delegate & window manager
 │   ├── Accounts.swift       # Connected CLI accounts bridge (Claude, Codex, OpenCode)
-│   ├── desktop.js           # Desktop environment adapter
+│   ├── accounts.js          # Connected-accounts panel, shared by both desktop apps
+│   ├── desktop.js           # Desktop environment adapter (WKWebView transport)
 │   ├── build.py             # Packaging & ad-hoc code signing script
 │   ├── verify_desktop.mjs   # Native desktop bridge test suite
 │   └── README.md            # macOS app documentation and build manual
+├── windows/                 # Native Windows companion application
+│   ├── Program.cs           # C# host: windows, bridge dispatch, streamed fetch
+│   ├── Accounts.cs          # Connected CLI accounts bridge (Claude, Codex, OpenCode)
+│   ├── desktop.js           # Desktop environment adapter (WebView2 transport)
+│   ├── MetaPrompt.csproj    # .NET 8 single-file, self-contained win-x64 build
+│   ├── build.py             # Publishes the host and assembles the web assets
+│   ├── verify_desktop.mjs   # Bridge, build-list & endpoint-allowlist test suite
+│   └── README.md            # Windows app documentation and build manual
 ├── methodology.md           # Formal Ana Beyin prompt architecture specification
 ├── compliance.md            # Privacy and data handling disclosures
 ├── performance_report.md    # SNN latency and throughput benchmark results
@@ -178,6 +190,17 @@ Requires macOS 13 or newer on Apple Silicon (M1/M2/M3/M4):
    npm run build:macos
    ```
 3. The built application will be ready at `dist/MetaPrompt.app`. Double-click or copy to `/Applications`.
+
+### Windows Desktop App
+
+Requires Windows 10 (1809) or newer, 64-bit, with the Microsoft Edge WebView2 runtime (preinstalled on current Windows 10 and 11):
+
+1. Install the [.NET 8 SDK](https://dotnet.microsoft.com/download).
+2. Build the application:
+   ```sh
+   npm run build:windows
+   ```
+3. The built application will be ready at `dist/MetaPrompt-Windows/MetaPrompt.exe`. The folder is self-contained and can be copied anywhere.
 
 ---
 

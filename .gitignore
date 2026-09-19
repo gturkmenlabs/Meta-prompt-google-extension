@@ -7,9 +7,12 @@
 .env.*
 .trash/
 
-# Build output (regenerate with: python3 macos/build.py)
+# Build output (regenerate with: python3 macos/build.py, python3 windows/build.py)
 dist/
 macos/.build/
+windows/bin/
+windows/obj/
+windows/app.ico
 
 # Third-party runtime. Unreferenced by any source file; see README.
 macos/runtime/

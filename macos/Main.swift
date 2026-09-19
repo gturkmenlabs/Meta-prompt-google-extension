@@ -95,7 +95,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKScriptMessageHandler
         case "cancel": if let id = body["id"] as? String { requests[id]?.cancel() }; replyHandler(true, nil)
         case "fetch":
             guard let id = body["id"] as? String, let rawURL = body["url"] as? String, let url = URL(string: rawURL),
-                  ["https://api.anthropic.com/v1/messages", "https://openrouter.ai/api/v1/chat/completions", "https://openrouter.ai/api/v1/models"].contains(rawURL) else { replyHandler(nil, "Unsupported API endpoint"); return }
+                  ["https://api.anthropic.com/v1/messages", "https://openrouter.ai/api/v1/chat/completions", "https://openrouter.ai/api/v1/models", "https://api.typesafe.ai/v1/systemone"].contains(rawURL) else { replyHandler(nil, "Unsupported API endpoint"); return }
             var request = URLRequest(url: url); request.httpMethod = body["method"] as? String ?? "GET"; request.timeoutInterval = 90
             request.allHTTPHeaderFields = body["headers"] as? [String: String]
             if let text = body["body"] as? String { request.httpBody = Data(text.utf8) }

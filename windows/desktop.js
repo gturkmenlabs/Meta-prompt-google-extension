@@ -1,6 +1,41 @@
 // Compatibility bridge: reuse the extension's prompt engine in a native window.
+//
+// The macOS twin (macos/desktop.js) builds the same `chrome` shim; only the
+// transport differs, and the two are deliberately kept as separate files rather
+// than a shared one so neither host's quirks leak into the other. Both are
+// exercised by the same battery of offline checks (windows/verify_desktop.mjs,
+// macos/verify_desktop.mjs) — keep them in step when either changes.
+//
+// WKWebView hands JS a reply promise per message; WebView2 has no such thing,
+// so requests carry an id and the host answers with a matching __mpReply frame.
 (() => {
-  const native = (action, values = {}) => window.webkit.messageHandlers.native.postMessage({ action, ...values });
+  // WebView2 lives at window.chrome.webview and this file replaces window.chrome
+  // wholesale a few lines down — grab the transport before it disappears.
+  const webview = window.chrome.webview;
+  const pending = new Map();
+
+  webview.addEventListener('message', (incoming) => {
+    const message = incoming.data;
+    if (!message || typeof message !== 'object') return;
+    if (message.__mpStream) { window.desktopReceive(message); return; }
+    const entry = pending.get(message.__mpReply);
+    if (!entry) return;
+    pending.delete(message.__mpReply);
+    if (message.ok) entry.resolve(message.value);
+    else entry.reject(new Error(message.error || 'Native request failed.'));
+  });
+
+  const native = (action, values = {}) => new Promise((resolve, reject) => {
+    const id = crypto.randomUUID();
+    pending.set(id, { resolve, reject });
+    try {
+      webview.postMessage({ __mpRequest: id, action, ...values });
+    } catch (error) {
+      pending.delete(id);
+      reject(error);
+    }
+  });
+
   const event = () => {
     const listeners = [];
     return { addListener(fn) { listeners.push(fn); }, emit(...args) { listeners.forEach(fn => fn(...args)); } };
@@ -49,6 +84,7 @@
     tabs: { async query() { return []; } }
   };
   Object.defineProperty(navigator, 'clipboard', { value: { writeText(text) { return native('copy', { text }); } } });
+
   const streams = new Map();
   window.desktopReceive = ({ id, data, done, error }) => {
     const entry = streams.get(id);

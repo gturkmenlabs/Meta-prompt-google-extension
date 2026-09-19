@@ -1,6 +1,8 @@
 // Login is owned by the official CLIs; this app never reads or copies OAuth tokens.
+// Shared by both desktop hosts: macos/build.py and windows/build.py copy this
+// file, and `window.desktopNative` is whichever bridge loaded first.
 (() => {
-  const native = (provider, operation, prompt) => window.webkit.messageHandlers.native.postMessage({action:'account', provider, operation, prompt});
+  const native = (provider, operation, prompt) => window.desktopNative('account', {provider, operation, prompt});
   globalThis.desktopAccountProvider = 'chatgpt';
   globalThis.desktopRevise = async (provider, plan) => {
     const prompt = plan.system + '\n\n' + plan.userText +

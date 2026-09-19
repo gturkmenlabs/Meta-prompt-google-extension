@@ -16,9 +16,17 @@ change to the prompt, brain, config, API, or content-script layers.
 
 The repo is git-tracked. Build output (`dist/`, `macos/.build/`) and the
 third-party `macos/runtime/` tree are ignored, so only hand-written sources are
-committed. The macOS app under `macos/` is built separately with
-`npm run build:macos` (`python3 macos/build.py`); it reuses the same prompt engine
-behind a `chrome.*` shim.
+committed. Two desktop apps are built separately from the same sources: macOS under `macos/`
+with `npm run build:macos` (Swift + WKWebView) and Windows under `windows/` with
+`npm run build:windows` (C# + WebView2, .NET 8 SDK required). Both reuse the same
+prompt engine behind a `chrome.*` shim and answer the same bridge contract —
+actions `get`/`set`/`remove`/`settings`/`copy`/`fetch`/`cancel`/`account`, with
+streamed responses arriving as `window.desktopReceive({id, data, done, error})`.
+Their two `desktop.js` files are separate on purpose (WKWebView gives each message
+a reply promise; WebView2 needs explicit request ids), so a change to one usually
+belongs in the other; both expose `window.desktopNative` for the shared
+`macos/accounts.js` panel. `windows/verify_desktop.mjs` fails when the two build
+scripts' file lists or the two hosts' endpoint allowlists drift apart.
 
 ## Loading / "running" the extension
 
@@ -59,7 +67,7 @@ Key cross-file contracts:
 - All persistent state lives in `chrome.storage.local`. Notable keys: `provider`, `anthropicKey`/`anthropicModel`, `openrouterKey`/`openrouterModel`, `openrouterWorkingModels`, `crossProviderFallback`, `typesafeKey`/`typesafeEnabled`/`typesafeMinConfidence`, `language`, `length`, `mode`, `consensusCheck`, `selectedText`, `lastInPlaceResult`, `lastError`, plus the SNN state keys written by `brain_helper.js`.
 - `background.js` is an ES module service worker (`"type": "module"` in manifest) — use `import` statements, not `importScripts`. Dynamic `import()` is used for `brain_helper.js` reward path to avoid loading it on every cold start.
 - Badge text on `chrome.action` is the primary user feedback for the in-place flow (`…`, `✓`, `copy`, `key`, `err`, `?`, `↩`). Always pair `setBadge` with `clearBadgeLater` to avoid sticky badges.
-- The verification scripts are standalone — not wired into the extension runtime. `verify_prompt.js` covers the prompt layer (122 structural checks, 22 of them Turkish task detection); `verify_brain.js` covers the SNN; `verify_runtime.mjs` covers provider key isolation, the failover contract, streaming failure handling, focus locking and undo against offline mocks; `macos/verify_desktop.mjs` covers the desktop bridge, including a check that every module imported by the shared engine is in `macos/build.py`'s copy list — that list is explicit, so a new module is otherwise only missed once the app launches. `node verify_prompt.js --show "<raw text>"` dumps the system prompt + user message a given input would produce.
+- The verification scripts are standalone — not wired into the extension runtime. `verify_prompt.js` covers the prompt layer (122 structural checks, 22 of them Turkish task detection); `verify_brain.js` covers the SNN; `verify_runtime.mjs` covers provider key isolation, the failover contract, streaming failure handling, focus locking and undo against offline mocks; `macos/verify_desktop.mjs` and `windows/verify_desktop.mjs` cover the two desktop bridges, including a check that every module imported by the shared engine is in `macos/build.py`'s copy list — that list is explicit, so a new module is otherwise only missed once the app launches. `node verify_prompt.js --show "<raw text>"` dumps the system prompt + user message a given input would produce.
 - When you change behaviour that a script asserts, update the assertion to the new contract rather than loosening it until it passes.
 
 ## Reference docs in repo
