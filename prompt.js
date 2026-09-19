@@ -213,8 +213,14 @@ const MODULES = {
   }
 };
 
-export function buildSystemBase(rawText, snnValues = null, length = "orta") {
-  const taskType = detectTaskType(rawText);
+// `taskTypeOverride` lets a caller supply a task type it resolved some other way
+// (see the TypeSafe classifier wired up in background.js). An override that is
+// not one of the known module keys is ignored rather than trusted, so a bad
+// value from an external service can only cost a keyword classification.
+export function buildSystemBase(rawText, snnValues = null, length = "orta", taskTypeOverride = null) {
+  const taskType = (taskTypeOverride && Object.hasOwn(MODULES.role, taskTypeOverride))
+    ? taskTypeOverride
+    : detectTaskType(rawText);
   const isShort = length === "kisa";
   // A multi-phase workflow is pointless for simple, single-output tasks.
   const simpleTask = taskType === "email" || taskType === "summary" || taskType === "translation";
@@ -941,7 +947,7 @@ export function resolveAutoStrategy(mode, strategyValue, rawText = "") {
   return strategyValue;
 }
 
-export function buildSystemPrompt(language = "auto", rawText = "", snnValues = null, mode = "standard", vibeStrategy = "jazz", researchStrategy = "comprehensive", antihalluStrategy = "ensemble", length = "orta") {
+export function buildSystemPrompt(language = "auto", rawText = "", snnValues = null, mode = "standard", vibeStrategy = "jazz", researchStrategy = "comprehensive", antihalluStrategy = "ensemble", length = "orta", taskTypeOverride = null) {
   if (mode === "vibecoding") {
     return buildVibeCodingSystemPrompt(language, rawText, snnValues, vibeStrategy);
   }
@@ -951,7 +957,9 @@ export function buildSystemPrompt(language = "auto", rawText = "", snnValues = n
   if (mode === "antihallu") {
     return buildAntiHallucinationSystemPrompt(language, rawText, snnValues, antihalluStrategy);
   }
-  const base = buildSystemBase(rawText, snnValues, length);
+  // Only the standard path takes the override: the other modes derive their task
+  // type from the selected strategy, not from what the raw text looks like.
+  const base = buildSystemBase(rawText, snnValues, length, taskTypeOverride);
   const mandate = LANGUAGE_MANDATES[language] || LANGUAGE_MANDATES.auto;
   return `${base}\n\n${mandate}`;
 }

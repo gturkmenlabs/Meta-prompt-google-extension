@@ -2,6 +2,8 @@
 // Each provider's key and model are stored separately, so switching providers
 // does not wipe the other one's settings.
 
+import { DEFAULT_MIN_CONFIDENCE } from "./typesafe.js";
+
 export const PROVIDERS = {
   anthropic: {
     label: "Anthropic (direct)",
@@ -106,4 +108,33 @@ export async function getFailoverConfig() {
     .slice(0, MAX_BACKUP_MODELS + 1);
 
   return { provider, apiKey: apiKeys[provider], apiKeys, models };
+}
+
+// ——— TypeSafe (prompt brain task classifier) ———
+// Not a revision provider: TypeSafe never sees a revision request and is never
+// part of the failover list. It answers one Choice question about the raw text
+// so the prompt brain can pick its modules. Kept out of PROVIDERS deliberately —
+// putting it there would let it into the model failover list.
+//
+// Opt-in, default off: turning it on sends the opening of the source text to a
+// third service the user has not otherwise chosen, the same reason
+// crossProviderFallback defaults off.
+export const TYPESAFE_KEY_FIELD = "typesafeKey";
+export const TYPESAFE_ENABLED_KEY = "typesafeEnabled";
+export const TYPESAFE_MIN_CONFIDENCE_KEY = "typesafeMinConfidence";
+
+export async function getTypesafeConfig() {
+  const stored = await chrome.storage.local.get([
+    TYPESAFE_KEY_FIELD, TYPESAFE_ENABLED_KEY, TYPESAFE_MIN_CONFIDENCE_KEY
+  ]);
+  const apiKey = stored[TYPESAFE_KEY_FIELD] || "";
+  const raw = Number(stored[TYPESAFE_MIN_CONFIDENCE_KEY]);
+  const minConfidence = Number.isFinite(raw) && raw > 0 && raw <= 1 ? raw : DEFAULT_MIN_CONFIDENCE;
+  return {
+    apiKey,
+    // Both the key and the explicit opt-in are required; a leftover key from an
+    // earlier experiment must not silently start shipping text again.
+    enabled: stored[TYPESAFE_ENABLED_KEY] === true && Boolean(apiKey),
+    minConfidence
+  };
 }
