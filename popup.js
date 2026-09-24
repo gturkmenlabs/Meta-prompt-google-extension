@@ -360,7 +360,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
   // ——— Load initial state from storage ———
   chrome.storage.local.get(
-    ["selectedText", "lastInPlaceResult", "lastError", "language", "length", "mode", "vibeStrategy", "researchStrategy", "antihalluStrategy", "consensusCheck"],
+    ["selectedText", "lastInPlaceResult", "lastError", "language", "length", "mode", "vibeStrategy", "researchStrategy", "antihalluStrategy", "consensusCheck", "hdaMode", "hdaEnabled"],
     (data) => {
       if (data.selectedText) {
         rawInput.value = data.selectedText;
@@ -392,6 +392,13 @@ document.addEventListener("DOMContentLoaded", () => {
       }
       const consensusToggle = document.getElementById("consensusCheckToggle");
       if (consensusToggle) consensusToggle.checked = !!data.consensusCheck;
+      const hdaSelect = document.getElementById("hdaModeSelect");
+      // Same resolution as background.js getHdaMode(): legacy hdaEnabled=false means off.
+      if (hdaSelect) {
+        hdaSelect.value = ["agents", "inline", "off"].includes(data.hdaMode)
+          ? data.hdaMode
+          : (data.hdaEnabled === false ? "off" : "agents");
+      }
       updateModeDescs();
       updateOutputDescs();
       chrome.storage.local.remove(["selectedText", "lastInPlaceResult", "lastError"]);
@@ -431,6 +438,13 @@ document.addEventListener("DOMContentLoaded", () => {
   if (consensusCheckToggle) {
     consensusCheckToggle.addEventListener("change", () =>
       chrome.storage.local.set({ consensusCheck: consensusCheckToggle.checked })
+    );
+  }
+
+  const hdaModeSelect = document.getElementById("hdaModeSelect");
+  if (hdaModeSelect) {
+    hdaModeSelect.addEventListener("change", () =>
+      chrome.storage.local.set({ hdaMode: hdaModeSelect.value })
     );
   }
 
@@ -546,6 +560,16 @@ document.addEventListener("DOMContentLoaded", () => {
           return;
         }
 
+        if (response.type === "hda") {
+          // HDA phase agents run before the prompt streams: show the real phase
+          // instead of the canned step animation.
+          clearInterval(stepInterval);
+          stepInterval = null;
+          if (btnStep) btnStep.textContent = `HDA ${response.index + 1}/${response.total}: ${response.name}…`;
+          if (reviseProgress) reviseProgress.style.width = `${10 + ((response.index + 1) / response.total) * 60}%`;
+          return;
+        }
+
         if (response.type === "checking") {
           if (doneMsg) doneMsg.textContent = "Judge model reviewing…";
           return;
@@ -565,7 +589,7 @@ document.addEventListener("DOMContentLoaded", () => {
         }
 
         // done
-        const { result, usedModel, fellBack, consensus, snnValues, resolvedStrategy } = response;
+        const { result, usedModel, fellBack, consensus, snnValues, resolvedStrategy, hdaStatus, cached } = response;
         output.value = result;
         if (reviseProgress) reviseProgress.style.width = "100%";
 
@@ -588,10 +612,17 @@ document.addEventListener("DOMContentLoaded", () => {
             setStatus(`Consensus warning (${judge}):\n${consensus.issues}`, "error");
           }
         }
+        const hdaLabel = {
+          agents: " · HDA 5/5",
+          "agents-short": " · HDA 2/5 (short)",
+          inline: " · HDA inline",
+          "inline-fallback": " · HDA inline (agents failed)"
+        }[hdaStatus] || "";
         if (doneMsg) {
+          const cachedLabel = cached ? " · from cache (no API call)" : "";
           doneMsg.textContent = fellBack
-            ? `Ready · ${shortModel} (backup)${autoLabel}${consensusLabel}${snnStats}`
-            : `Ready · ${shortModel}${autoLabel}${consensusLabel}${snnStats}`;
+            ? `Ready · ${shortModel} (backup)${autoLabel}${hdaLabel}${consensusLabel}${cachedLabel}${snnStats}`
+            : `Ready · ${shortModel}${autoLabel}${hdaLabel}${consensusLabel}${cachedLabel}${snnStats}`;
         }
 
         showResult();

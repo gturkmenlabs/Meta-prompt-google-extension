@@ -2,7 +2,7 @@
 
 [![Manifest V3](https://img.shields.io/badge/Chrome_Extension-Manifest_V3-4285F4?logo=googlechrome&logoColor=white)](manifest.json)
 [![macOS Companion](https://img.shields.io/badge/macOS-Apple_Silicon_Native-000000?logo=apple&logoColor=white)](macos/README.md)
-[![Tests](https://img.shields.io/badge/Offline_Checks-122%2B_Passing-success?logo=node.js&logoColor=white)](package.json)
+[![Tests](https://img.shields.io/badge/Offline_Checks-200%2B_Passing-success?logo=node.js&logoColor=white)](package.json)
 [![Providers](https://img.shields.io/badge/Providers-Anthropic_%7C_OpenRouter-blueviolet)](config.js)
 [![Privacy](https://img.shields.io/badge/Privacy-100%25_Local_Storage-green)](compliance.md)
 
@@ -43,6 +43,9 @@ Meta-Prompt transforms raw user thoughts, drafts, and queries in real time into 
   - Automatic model failover (capped at 3 backup retries to prevent prolonged hangs).
   - Cross-provider fallback is strictly opt-in and off by default.
   - Immediate failover halt on authentication errors (401/403).
+- **HDA Thinking Algorithm**: A five-phase audit (epistemic filter, conceptual analysis, intentionality check, rational inference, hylomorphic synthesis) runs on every revision — either as five sequential phase agents (default, deepest) or as a single inline directive with no extra calls. If a phase agent fails, the revision falls back to the inline audit instead of stopping.
+- **Efficiency Layer**: A local semantic cache (50 entries, 24 h TTL) returns repeated requests without an API call; system prompts are compressed only when every protected rule survives; long Anthropic system prompts use prompt-cache breakpoints on the stable prefix.
+- **Optional TypeSafe Task Classification**: Off by default. When enabled in Settings, the first 2,000 characters are sent to TypeSafe to pick the task type; any failure or low confidence falls back to the keyword classifier.
 
 ---
 
@@ -54,11 +57,19 @@ Meta-Prompt transforms raw user thoughts, drafts, and queries in real time into 
 └───────────────────────────┬────────────────────────────┘
                             │
               ┌─────────────▼─────────────┐
-              │   Task Intent Classifier  │  (Bilingual TR/EN Keyword Scoring)
+              │      Semantic Cache       │  (Hit → return cached prompt)
+              └─────────────┬─────────────┘
+                            │
+              ┌─────────────▼─────────────┐
+              │   Task Intent Classifier  │  (TR/EN keywords, optional TypeSafe)
               └─────────────┬─────────────┘
                             │
               ┌─────────────▼─────────────┐
               │   SNN "Ana Beyin" Tick    │  (LIF Neurons + ACh/NE/DA Modulators)
+              └─────────────┬─────────────┘
+                            │
+              ┌─────────────▼─────────────┐
+              │    HDA Phase Agents       │  (5-phase audit, inline fallback)
               └─────────────┬─────────────┘
                             │
               ┌─────────────▼─────────────┐
@@ -130,19 +141,24 @@ In addition to the browser extension, this repository contains a standalone Appl
 ├── prompt.js                # Task detection, Ana Beyin prompt synthesis, mode engines
 ├── brain_network.js         # Biophysical LIF Spiking Neural Network simulation
 ├── brain_helper.js          # SNN persistence, modulator integration, synaptic reward
+├── hda_agents.js            # HDA five-phase audit agents with inline fallback
+├── efficiency.js            # Semantic cache, safe prompt compression, KV prefix caching
+├── typesafe.js              # Optional TypeSafe task classifier (opt-in, fail-open)
 ├── popup.html / popup.js    # Browser action popup UI & streaming port bridge
 ├── popup.css                # Extension popup layout and styling
 ├── options.html / options.js# Settings page for keys, providers, and failover options
 ├── options.css              # Settings layout styling
 ├── theme.css                # Shared design system (warm neutral & forest-green palette)
 ├── package.json             # Test runner configuration (npm test)
-├── verify_prompt.js         # 122 structural & bilingual prompt checks
+├── verify_prompt.js         # 184 structural, bilingual & HDA prompt checks
 ├── verify_brain.js          # SNN biophysical unit tests, benchmarks, stress tests
 ├── verify_runtime.mjs       # Mock-based runtime failover, undo, & isolation tests
+├── verify_efficiency.js     # Semantic cache, compression & KV caching checks
 ├── macos/                   # Native macOS companion application
 │   ├── Main.swift           # Swift macOS app delegate & window manager
 │   ├── Accounts.swift       # Connected CLI accounts bridge (Claude, Codex, OpenCode)
 │   ├── desktop.js           # Desktop environment adapter
+│   ├── accounts.js          # Connected-accounts UI bridge
 │   ├── build.py             # Packaging & ad-hoc code signing script
 │   ├── verify_desktop.mjs   # Native desktop bridge test suite
 │   └── README.md            # macOS app documentation and build manual
@@ -190,10 +206,11 @@ npm test
 ```
 
 This runs the comprehensive verification suite:
-- **`npm run test:prompt`**: 122 prompt structure tests, bilingual English & Turkish task classifiers, token boundaries, and anti-injection sanitization.
+- **`npm run test:prompt`**: 184 prompt structure tests, bilingual English & Turkish task classifiers, HDA directive and phase agents, token boundaries, and anti-injection sanitization.
 - **`npm run test:brain`**: SNN neuron membrane dynamics, Tsodyks-Markram plasticity, STDP pruning, serialization round-trips, and 10,000-step latency benchmarks.
-- **`npm run test:runtime`**: API key isolation, failover limits, SSE stream recovery, and target element locking.
-- **`npm run test:desktop`**: Native Swift/JS message bridges, Unicode clipboard buffers, and stream cancellation.
+- **`npm run test:runtime`**: API key isolation, failover limits, SSE stream recovery, target element locking, and TypeSafe opt-in / fail-open behavior.
+- **`npm run test:desktop`**: Native Swift/JS message bridges, Unicode clipboard buffers, stream cancellation, and the macOS build file list.
+- **`npm run test:efficiency`**: Semantic cache, protected-line compression, conciseness-scaled reward, and block/pyramid KV caching.
 
 ---
 
@@ -201,7 +218,7 @@ This runs the comprehensive verification suite:
 
 - **Zero External Telemetry**: The extension contains no third-party tracking, analytics, or remote logging.
 - **100% Local Storage**: Settings, preferences, and neural synaptic weights are stored exclusively in Chrome's `chrome.storage.local` (or `state.json` on macOS).
-- **Direct API Connections**: Prompts are transmitted strictly between your device and your chosen AI provider (Anthropic or OpenRouter).
+- **Direct API Connections**: Prompts are transmitted directly between your device and your chosen AI provider (Anthropic or OpenRouter). The only other destination is TypeSafe, and only if you enable its classifier in Settings (first 2,000 characters).
 - **Cross-Provider Protection**: Your text is never routed to an alternative provider during failover unless you explicitly opt in via Settings.
 - **Local History Redaction**: Reversible obfuscation is applied to recent history, with best-effort masking of common API keys and sensitive tokens.
 

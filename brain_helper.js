@@ -1,5 +1,6 @@
 import { BrainNetwork } from "./brain_network.js";
 import { VIBE_STRATEGY_REGISTRY } from "./prompt.js";
+import { conciseReward, getReasoningBudget, scoreConciseness } from "./efficiency.js";
 
 const BRAIN_STORAGE_KEY = "ana_beyin_state";
 const NUM_NEURONS = 30;
@@ -118,6 +119,20 @@ export async function runBrainSimulation(taskType) {
     NE: Number(network.NE.toFixed(3)),
     DA: Number(network.DA.toFixed(3))
   };
+}
+
+/**
+ * ConciseRL-style dynamic reward: scales the base dopaminergic signal by
+ * semantic brevity so concise, non-redundant outputs reinforce more strongly
+ * and overthinking (redundant reasoning chains) reinforces less.
+ * Returns the applied reward value.
+ */
+export async function rewardBrainWithConciseness(baseReward, result = "", { rawText = "", taskType = "general", length = "orta" } = {}) {
+  const budget = getReasoningBudget(taskType, length);
+  const brevity = scoreConciseness(result, { rawText, budget });
+  const scaled = conciseReward(baseReward, result, { rawText, budget });
+  await rewardBrain(scaled);
+  return { applied: scaled, brevity, budget };
 }
 
 /**

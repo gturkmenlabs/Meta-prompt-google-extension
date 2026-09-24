@@ -7,6 +7,8 @@ import { getFailoverConfig, getTypesafeConfig } from "./config.js";
 import { classifyTaskType } from "./typesafe.js";
 import { buildSystemPrompt, buildUserMessage, buildConsensusJudgeMessages, maxTokensFor, detectTaskType, resolveAutoStrategy } from "./prompt.js";
 import { runBrainSimulation } from "./brain_helper.js";
+import { runHdaAgents, buildHdaReportBlock } from "./hda_agents.js";
+import { semanticCacheLookup, semanticCacheStore, compressSystemPrompt } from "./efficiency.js";
 
 const MENU_TO_POPUP = "revizeMetaPrompt";
 const MENU_INPLACE = "revizeInPlace";
@@ -33,6 +35,38 @@ async function resolveStandardTaskType(mode, rawText) {
   } catch (error) {
     console.warn("TypeSafe task classification skipped:", error);
     return null;
+  }
+}
+
+// HDA setting: "agents" (default), "inline" or "off". The older boolean
+// `hdaEnabled: false` still reads as off.
+const HDA_MODES = ["agents", "inline", "off"];
+async function getHdaMode() {
+  const { hdaMode, hdaEnabled } = await chrome.storage.local.get(["hdaMode", "hdaEnabled"]);
+  if (HDA_MODES.includes(hdaMode)) return hdaMode;
+  return hdaEnabled === false ? "off" : "agents";
+}
+
+// Runs the HDA phase agents (sequential calls over the same failover model
+// list as the revision) and returns what buildSystemPrompt/buildUserMessage
+// need. Any phase failure falls back to the single-pass inline audit, so the
+// agents can slow a revision down but never block it.
+async function resolveHda({ hdaMode, rawText, length, provider, apiKeys, models, onPhase = null }) {
+  if (hdaMode === "off") return { hda: false, hdaReport: "", hdaStatus: "off" };
+  if (hdaMode === "inline") return { hda: true, hdaReport: "", hdaStatus: "inline" };
+  try {
+    const run = await runHdaAgents({
+      rawText,
+      length,
+      onPhase,
+      call: async ({ system, userText, maxTokens }) => (await reviseWithFailover({
+        provider, apiKey: apiKeys[provider], apiKeys, models, system, userText, maxTokens
+      })).result
+    });
+    return { hda: "agents", hdaReport: buildHdaReportBlock(run), hdaStatus: run.short ? "agents-short" : "agents" };
+  } catch (error) {
+    console.warn("HDA agents failed; using the inline HDA audit:", error);
+    return { hda: true, hdaReport: "", hdaStatus: "inline-fallback" };
   }
 }
 
@@ -137,9 +171,10 @@ async function runConsensusCheck({ provider, apiKeys, models, usedModel, rawText
   try {
     const { consensusCheck } = await chrome.storage.local.get("consensusCheck");
     if (!consensusCheck) return null;
+    const hdaMode = await getHdaMode();
     const judgeModels = (models || []).filter((m) => m !== usedModel);
     if (!judgeModels.length) return { status: "skipped", reason: "No different model available to judge" };
-    const { system, userText } = buildConsensusJudgeMessages(rawText, result);
+    const { system, userText } = buildConsensusJudgeMessages(rawText, result, { hda: hdaMode !== "off" });
     const { result: verdictRaw, usedModel: judgeModel } = await reviseWithFailover({
       provider,
       apiKey: apiKeys[provider],
@@ -193,6 +228,7 @@ async function reviseInPlace(tab, selectionText = "") {
     const prefs = await chrome.storage.local.get([
       "language", "length", "mode", "vibeStrategy", "researchStrategy", "antihalluStrategy"
     ]);
+    const hdaMode = await getHdaMode();
     const language = prefs.language || "auto";
     const length = prefs.length || "orta";
     const mode = prefs.mode || "standard";
@@ -201,6 +237,28 @@ async function reviseInPlace(tab, selectionText = "") {
     const antihalluStrategy = resolveAutoStrategy("antihallu",  prefs.antihalluStrategy || "auto", text);
 
     const typesafeTaskType = await resolveStandardTaskType(mode, text);
+
+    const inPlaceCacheConfig = cacheConfigFor({
+      language, length, mode, vibeStrategy, researchStrategy, antihalluStrategy,
+      taskTypeOverride: typesafeTaskType, hdaMode
+    });
+
+    // 0) Outermost semantic cache for the in-place path as well.
+    try {
+      const hit = await semanticCacheLookup(text, inPlaceCacheConfig);
+      if (hit && hit.result) {
+        await writeQueue;
+        const wroteOk = await sendToTab(tabId, { type: "STREAM_EDITABLE_TEXT", text: hit.result, done: true });
+        if (wroteOk && wroteOk.ok) {
+          setBadge(tabId, "✓", "#34a853");
+        } else {
+          chrome.storage.local.set({ selectedText: text, lastInPlaceResult: hit.result });
+          setBadge(tabId, "copy", "#f9ab00");
+        }
+        clearBadgeLater(tabId);
+        return;
+      }
+    } catch (_) {}
 
     // 3) Run biophysical SNN simulation tick
     let snnValues = null;
@@ -216,6 +274,13 @@ async function reviseInPlace(tab, selectionText = "") {
     } catch (snnError) {
       console.warn("SNN simulation failed, using static fallback:", snnError);
     }
+
+    // 3b) HDA phase agents: the badge shows which phase is running (H1…H5).
+    const { hda, hdaReport } = await resolveHda({
+      hdaMode, rawText: text, length, provider, apiKeys, models,
+      onPhase: ({ agent }) => setBadge(tabId, `H${agent.id.slice(-1)}`, "#7b1fa2")
+    });
+    setBadge(tabId, "…", "#1a73e8");
 
     // 4) Revise — streaming: the result is written to the box as it is generated.
     // Intermediate writes happen ~every 150ms with the FULL accumulated text (fire-and-forget);
@@ -248,8 +313,8 @@ async function reviseInPlace(tab, selectionText = "") {
       apiKey,
       apiKeys,
       models,
-      system: buildSystemPrompt(language, text, snnValues, mode, vibeStrategy, researchStrategy, antihalluStrategy, length, typesafeTaskType),
-      userText: buildUserMessage(text, { language, length, mode, vibeStrategy, researchStrategy, antihalluStrategy }),
+      system: compressSystemSafe(buildSystemPrompt(language, text, snnValues, mode, vibeStrategy, researchStrategy, antihalluStrategy, length, typesafeTaskType, hda), length),
+      userText: buildUserMessage(text, { language, length, mode, vibeStrategy, researchStrategy, antihalluStrategy, hdaReport }),
       maxTokens: maxTokensFor(length),
       onDelta: (chunk) => {
         acc += chunk;
@@ -268,6 +333,9 @@ async function reviseInPlace(tab, selectionText = "") {
 
     // 5) Final write: full result + done=true (binds the undo state).
     await writeQueue;
+    try {
+      await semanticCacheStore(text, inPlaceCacheConfig, { result, usedModel });
+    } catch (_) {}
     const wroteOk = !writeBroken && await streamWrite(result, true);
     if (wroteOk) {
       // The page holds the result, so drop the crash-recovery copy; otherwise the
@@ -275,8 +343,8 @@ async function reviseInPlace(tab, selectionText = "") {
       if (savedPartial) chrome.storage.local.remove("lastInPlaceResult");
       setBadge(tabId, "✓", "#34a853");
       try {
-        const { rewardBrain } = await import("./brain_helper.js");
-        await rewardBrain(1.0);
+        const { rewardBrainWithConciseness } = await import("./brain_helper.js");
+        await rewardBrainWithConciseness(1.0, result, { rawText: text, length });
       } catch (_) {}
       // Optional cross-model consensus: if the judge finds issues, show the "≠"
       // badge and write the findings to lastError (readable from the popup).
@@ -333,7 +401,31 @@ async function handleRewardBrainMessage(message, sendResponse) {
 
 // Shared preparation for the REVISE_PROMPT / stream path: resolve strategies,
 // run the SNN, and build the provider/model plan and the prompts.
-async function prepareRevision(message) {
+// `onPhase` reports HDA agent progress to the caller (the popup port).
+//
+// Efficiency order (outermost first):
+//   1. semantic cache lookup (repeated queries never reach SNN/HDA/API),
+//   2. SNN tick + HDA agents,
+//   3. Psi-safe compression of the assembled system prompt.
+function cacheConfigFor({ language, length, mode, vibeStrategy, researchStrategy, antihalluStrategy, taskTypeOverride = null, hdaMode = "agents" }) {
+  return { language, length, mode, vibeStrategy, researchStrategy, antihalluStrategy, taskTypeOverride, hda: hdaMode };
+}
+
+const SYSTEM_COMPRESSION_BUDGET = { kisa: 4000, orta: 8000, uzun: 12000, maks: 20000 };
+
+function compressSystemSafe(system, length) {
+  const maxChars = SYSTEM_COMPRESSION_BUDGET[length] || SYSTEM_COMPRESSION_BUDGET.orta;
+  if (String(system || "").length <= maxChars) return system;
+  try {
+    const { text, psi } = compressSystemPrompt(system, { maxChars });
+    // Psi must stay high: only accept fully protected compressions.
+    return psi >= 1 ? text : system;
+  } catch (_) {
+    return system;
+  }
+}
+
+async function prepareRevision(message, { onPhase = null } = {}) {
   const { language = "auto", length = "orta", mode = "standard", rawText } = message;
   if (typeof rawText !== "string" || !rawText.trim()) throw new Error("Enter some text to revise.");
   if (rawText.length > 100000) throw new Error("Source text is too long. Use at most 100,000 characters.");
@@ -344,6 +436,28 @@ async function prepareRevision(message) {
 
   const { provider, apiKeys, models } = await getFailoverConfig();
   const typesafeTaskType = await resolveStandardTaskType(mode, rawText);
+  let hdaMode = await getHdaMode();
+  // The desktop account providers (Claude Code / Codex / OpenCode) revise
+  // without an API key, so the phase agents have nothing to call there.
+  if (hdaMode === "agents" && globalThis.desktopAccountProvider) hdaMode = "inline";
+
+  // 0) Outermost semantic cache: identical or near-duplicate queries with the
+  // same config short-circuit before SNN, HDA agents, or any model call.
+  try {
+    const cacheConfig = cacheConfigFor({
+      language, length, mode, vibeStrategy, researchStrategy, antihalluStrategy,
+      taskTypeOverride: typesafeTaskType, hdaMode
+    });
+    const hit = await semanticCacheLookup(rawText, cacheConfig);
+    if (hit) {
+      return {
+        provider, apiKeys, models, snnValues: null, resolvedStrategy: null,
+        hdaStatus: "cache-hit", system: "", userText: "", maxTokens: maxTokensFor(length),
+        cached: true, cachedResult: hit.result, cachedModel: hit.usedModel || "",
+        cacheConfig
+      };
+    }
+  } catch (_) {}
 
   let snnValues = null;
   try {
@@ -364,14 +478,26 @@ async function prepareRevision(message) {
     : mode === "antihallu" ? antihalluStrategy
     : null;
 
+  const { hda, hdaReport, hdaStatus } = await resolveHda({
+    hdaMode, rawText, length, provider, apiKeys, models, onPhase
+  });
+
+  const rawSystem = buildSystemPrompt(language, rawText, snnValues, mode, vibeStrategy, researchStrategy, antihalluStrategy, length, typesafeTaskType, hda);
+  const cacheConfig = cacheConfigFor({
+    language, length, mode, vibeStrategy, researchStrategy, antihalluStrategy,
+    taskTypeOverride: typesafeTaskType, hdaMode
+  });
+
   return {
     provider,
     apiKeys,
     models,
     snnValues,
     resolvedStrategy,
-    system: buildSystemPrompt(language, rawText, snnValues, mode, vibeStrategy, researchStrategy, antihalluStrategy, length, typesafeTaskType),
-    userText: buildUserMessage(rawText, { language, length, mode, vibeStrategy, researchStrategy, antihalluStrategy }),
+    hdaStatus,
+    cacheConfig,
+    system: compressSystemSafe(rawSystem, length),
+    userText: buildUserMessage(rawText, { language, length, mode, vibeStrategy, researchStrategy, antihalluStrategy, hdaReport }),
     maxTokens: maxTokensFor(length)
   };
 }
@@ -379,6 +505,10 @@ async function prepareRevision(message) {
 async function handleRevisePromptMessage(message, sendResponse) {
   try {
     const plan = await prepareRevision(message);
+    if (plan.cached) {
+      sendResponse({ ok: true, result: plan.cachedResult, usedModel: plan.cachedModel, fellBack: false, consensus: null, snnValues: null, resolvedStrategy: plan.resolvedStrategy, hdaStatus: plan.hdaStatus, cached: true });
+      return;
+    }
     const { result, usedModel, fellBack } = await reviseWithFailover({
       provider: plan.provider,
       apiKey: plan.apiKeys[plan.provider],
@@ -392,7 +522,10 @@ async function handleRevisePromptMessage(message, sendResponse) {
       provider: plan.provider, apiKeys: plan.apiKeys, models: plan.models,
       usedModel, rawText: message.rawText, result
     });
-    sendResponse({ ok: true, result, usedModel, fellBack, consensus, snnValues: plan.snnValues, resolvedStrategy: plan.resolvedStrategy });
+    try {
+      await semanticCacheStore(message.rawText, plan.cacheConfig || {}, { result, usedModel });
+    } catch (_) {}
+    sendResponse({ ok: true, result, usedModel, fellBack, consensus, snnValues: plan.snnValues, resolvedStrategy: plan.resolvedStrategy, hdaStatus: plan.hdaStatus });
   } catch (error) {
     sendResponse({ ok: false, error: error.message || String(error) });
   }
@@ -416,13 +549,19 @@ chrome.runtime.onConnect.addListener((port) => {
     if (message.type !== "REVISE_PROMPT_STREAM" || busy || disconnected) return;
     busy = true;
     try {
-      const plan = await prepareRevision(message);
+      const plan = await prepareRevision(message, {
+        onPhase: ({ index, total, agent }) => safePost({ type: "hda", index, total, name: agent.name })
+      });
+      if (plan.cached) {
+        safePost({ type: "done", result: plan.cachedResult, usedModel: plan.cachedModel, fellBack: false, consensus: null, snnValues: null, resolvedStrategy: plan.resolvedStrategy, hdaStatus: plan.hdaStatus, cached: true });
+        return;
+      }
       if (globalThis.desktopAccountProvider && globalThis.desktopRevise) {
         const provider = globalThis.desktopAccountProvider;
         safePost({ type: "delta", text: "" });
         const result = await globalThis.desktopRevise(provider, plan);
         safePost({ type: "done", result, usedModel: { chatgpt: "ChatGPT account (Codex)", opencode: "OpenCode (default model)" }[provider] || "Claude account (Claude Code)",
-          fellBack: false, consensus: null, snnValues: plan.snnValues, resolvedStrategy: plan.resolvedStrategy });
+          fellBack: false, consensus: null, snnValues: plan.snnValues, resolvedStrategy: plan.resolvedStrategy, hdaStatus: plan.hdaStatus });
         return;
       }
       const { result, usedModel, fellBack } = await reviseStreamWithFailover({
@@ -441,7 +580,10 @@ chrome.runtime.onConnect.addListener((port) => {
         provider: plan.provider, apiKeys: plan.apiKeys, models: plan.models,
         usedModel, rawText: message.rawText, result
       });
-      safePost({ type: "done", result, usedModel, fellBack, consensus, snnValues: plan.snnValues, resolvedStrategy: plan.resolvedStrategy });
+      try {
+        await semanticCacheStore(message.rawText, plan.cacheConfig || {}, { result, usedModel });
+      } catch (_) {}
+      safePost({ type: "done", result, usedModel, fellBack, consensus, snnValues: plan.snnValues, resolvedStrategy: plan.resolvedStrategy, hdaStatus: plan.hdaStatus });
     } catch (error) {
       safePost({ type: "error", error: error.message || String(error) });
     } finally {

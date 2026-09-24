@@ -2,9 +2,26 @@
 //  - Anthropic Messages API (x-api-key, separate system field, content block array)
 //  - OpenRouter Chat Completions API (Bearer, system as a message, choices[].message)
 
+import { toCacheableSystemBlocks } from "./efficiency.js";
+
 const ANTHROPIC_URL = "https://api.anthropic.com/v1/messages";
 const OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions";
 const ANTHROPIC_VERSION = "2023-06-01";
+
+// Block-level KV prefix caching: stable instruction blocks are sent with
+// `cache_control` breakpoints so the inference engine can reuse KV across
+// calls. Plain strings pass through unchanged (OpenRouter path flattens).
+function systemForAnthropic(system) {
+  if (Array.isArray(system)) return system;
+  const text = String(system || "");
+  // Short prompts gain nothing from breakpoints; keep the wire format stable.
+  if (text.length < 800) return text;
+  try {
+    return toCacheableSystemBlocks(text);
+  } catch (_) {
+    return text;
+  }
+}
 
 // OpenRouter/upstream errors can be nested JSON; collapse to a readable single line.
 function parseErrorMessage(detail) {
@@ -71,7 +88,7 @@ async function reviseAnthropic({ apiKey, model, system, userText, maxTokens }) {
     {
       model,
       max_tokens: maxTokens,
-      system,
+      system: systemForAnthropic(system),
       messages: [{ role: "user", content: userText }]
     }
   );
@@ -272,7 +289,7 @@ async function reviseAnthropicStream({ apiKey, model, system, userText, maxToken
       model,
       max_tokens: maxTokens,
       stream: true,
-      system,
+      system: systemForAnthropic(system),
       messages: [{ role: "user", content: userText }]
     },
     (json) => {

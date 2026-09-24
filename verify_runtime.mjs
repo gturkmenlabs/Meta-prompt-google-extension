@@ -80,7 +80,7 @@ assert.equal(second.value,'user edit');
 // The classifier is optional and must fail open: every rejection path below has
 // to leave the caller with null, which background.js reads as "use keywords".
 const {
-  classifyTaskType, readChoiceAnswer, buildClassifyRequest, MAX_CLASSIFY_CHARS, DEFAULT_MIN_CONFIDENCE
+  classifyTaskType, readChoiceAnswer, buildClassifyRequest, MAX_CLASSIFY_CHARS, DEFAULT_MIN_CONFIDENCE, TYPESAFE_API_URL
 } = await import('./typesafe.js');
 const { getTypesafeConfig } = await import('./config.js');
 
@@ -99,7 +99,19 @@ assert.equal((await getTypesafeConfig()).minConfidence, DEFAULT_MIN_CONFIDENCE, 
 const longText = 'x'.repeat(MAX_CLASSIFY_CHARS + 500);
 assert.equal(buildClassifyRequest(longText).state.raw_text.length, MAX_CLASSIFY_CHARS, 'Classifier text is capped');
 
+// Request follows the documented contract (docs.typesafe.ai/api.md).
+const classifyReq = buildClassifyRequest('hello');
+assert.equal(classifyReq.model, 'jev-latest', 'Documented model alias');
+assert.ok(!Array.isArray(classifyReq.questions) && classifyReq.questions.task_type,
+  'Questions are an object keyed by question id');
+assert.equal(classifyReq.questions.task_type.type, 'choice');
+assert.equal(TYPESAFE_API_URL, 'https://api.typesafe.ai/v1/systemone', 'Documented endpoint');
+
 // The answer reader accepts the shapes the API may nest a Choice in.
+// Documented response envelope.
+const documented = readChoiceAnswer({model:'jev-1.13.0', answers:{task_type:{type:'choice', choice:'explain',
+  probabilities:{explain:0.8, general:0.2}, confidence:0.74}}, usage:{input_tokens:300, output_tokens:20}});
+assert.deepEqual([documented.value, documented.confidence], ['explain', 0.74], 'Documented Choice answer is read');
 assert.equal(readChoiceAnswer({answers:{task_type:{value:'coding',confidence:0.9}}}).value, 'coding');
 assert.equal(readChoiceAnswer({answers:[{id:'task_type',answer:'email'}]}).value, 'email');
 assert.equal(readChoiceAnswer({task_type:'summary'}).value, 'summary');
@@ -108,9 +120,15 @@ assert.equal(readChoiceAnswer({answers:{task_type:{value:'coding',probabilities:
 assert.equal(readChoiceAnswer(null), null);
 
 const ok = (body) => async () => new Response(JSON.stringify(body), {status:200});
-globalThis.fetch = ok({answers:{task_type:{value:'planning',confidence:0.91}}});
+let sentRequest = null;
+globalThis.fetch = async (url, init) => {
+  sentRequest = { url, body: JSON.parse(init.body) };
+  return new Response(JSON.stringify({answers:{task_type:{type:'choice', choice:'planning', confidence:0.91}}}), {status:200});
+};
 assert.deepEqual(await classifyTaskType({apiKey:'k', rawText:'haftalik spor programi hazirla'}),
   {taskType:'planning', confidence:0.91});
+assert.equal(sentRequest.url, TYPESAFE_API_URL, 'Classifier posts to the documented endpoint');
+assert.ok(sentRequest.body.questions.task_type, 'Classifier sends questions keyed by id');
 // Every unusable answer degrades to null rather than throwing.
 assert.equal(await classifyTaskType({apiKey:'', rawText:'hello'}), null, 'No key -> no call');
 assert.equal(await classifyTaskType({apiKey:'k', rawText:'   '}), null, 'Blank text -> no call');
