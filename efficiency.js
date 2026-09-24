@@ -40,8 +40,8 @@ export function hashString(text) {
   return (hash >>> 0).toString(16).padStart(8, "0");
 }
 
-export function configFingerprint({ language = "auto", length = "orta", mode = "standard", vibeStrategy = "", researchStrategy = "", antihalluStrategy = "", taskTypeOverride = null, hda = true } = {}) {
-  return [language, length, mode, vibeStrategy || "", researchStrategy || "", antihalluStrategy || "", taskTypeOverride || "", String(hda)].join("|");
+export function configFingerprint({ language = "auto", length = "orta", mode = "standard", vibeStrategy = "", researchStrategy = "", antihalluStrategy = "", taskTypeOverride = null, hda = true, claudeCommand = "" } = {}) {
+  return [language, length, mode, vibeStrategy || "", researchStrategy || "", antihalluStrategy || "", taskTypeOverride || "", String(hda), claudeCommand || ""].join("|");
 }
 
 export function getSemanticCacheKey(rawText, config = {}) {
