@@ -2,6 +2,8 @@
 // task of "rewriting raw text into an expert prompt". The output is the final
 // prompt the user can paste into another AI (NOT the answer to the question).
 
+import { detectClaudeCodeCommand, buildClaudeCodeSystemPrompt } from "./claude_commands.js";
+
 export function escapeXml(unsafe) {
   if (!unsafe) return "";
   return unsafe.replace(/[<>&'"]/g, (c) => {
@@ -1059,7 +1061,11 @@ function insertBeforeMandate(systemPrompt, block, mandate) {
 export function buildSystemPrompt(language = "auto", rawText = "", snnValues = null, mode = "standard", vibeStrategy = "jazz", researchStrategy = "comprehensive", antihalluStrategy = "ensemble", length = "orta", taskTypeOverride = null, hda = true) {
   const mandate = LANGUAGE_MANDATES[language] || LANGUAGE_MANDATES.auto;
   let systemPrompt;
-  if (mode === "vibecoding") {
+  // A leading Claude Code command is explicit intent, so it wins over the selected mode.
+  const claudeCommand = detectClaudeCodeCommand(rawText);
+  if (claudeCommand) {
+    systemPrompt = buildClaudeCodeSystemPrompt(claudeCommand, mandate);
+  } else if (mode === "vibecoding") {
     systemPrompt = buildVibeCodingSystemPrompt(language, rawText, snnValues, vibeStrategy);
   } else if (mode === "research") {
     systemPrompt = buildResearchSystemPrompt(language, rawText, snnValues, researchStrategy);
@@ -1666,17 +1672,20 @@ export function buildUserMessage(rawText, { language = "auto", length = "orta", 
     `- ${mandate}`,
     `- ${len.directive}`,
   ];
-  if (mode === "vibecoding") {
+  const claudeCommand = detectClaudeCodeCommand(rawText);
+  if (claudeCommand) {
+    list.push(`- Write the Claude Code prompt for the ${claudeCommand.id} command on the first line of the RAW TEXT, following the command guidance and output shape (do NOT run the task).`);
+  } else if (mode === "vibecoding") {
     list.push(`- Fill in the Vibe Coding prompt template strictly. Extract project name, stack details, and goal from the raw text.`);
     list.push(`- Adhere to the vibe strategy structure: ${vibeStrategy || "standard"}.`);
   }
-  if (mode === "research") {
+  if (!claudeCommand && mode === "research") {
     const strat = RESEARCH_STRATEGY_REGISTRY[researchStrategy] || RESEARCH_STRATEGY_REGISTRY.comprehensive;
     list.push(`- Build an expert research prompt (do NOT answer the question). Strategy focus: ${strat.label.en}.`);
     list.push(`- Include concrete Boolean queries, source/database routing, and a legal paywall-bypass directive.`);
     list.push(`- Extract the research topic from the raw text and decompose it into concepts and synonyms before forming queries.`);
   }
-  if (mode === "antihallu") {
+  if (!claudeCommand && mode === "antihallu") {
     const strat = ANTIHALLU_STRATEGY_REGISTRY[antihalluStrategy] || ANTIHALLU_STRATEGY_REGISTRY.ensemble;
     list.push(`- Build an anti-hallucination prompt (do NOT execute the task). Strategy focus: ${strat.label.en}.`);
     list.push(`- Enforce RAG-style <context>/<question> scaffold, [#] citation discipline, and an "I don't know" protocol.`);
