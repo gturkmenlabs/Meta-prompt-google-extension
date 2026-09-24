@@ -225,6 +225,23 @@
           </div>
         </div>
 
+        <!-- HDA: bes fazli Kartezyen-Hilomorfik dusunme algoritmasi (varsayilan: faz ajanlari) -->
+        <div class="mp-ctrl" id="hdaRow" style="margin-top:10px;">
+          <label class="mp-label tiny" for="hdaModeSelect">HDA thinking algorithm</label>
+          <div class="mp-select-wrap">
+            <select class="mp-select" id="hdaModeSelect">
+              <option value="agents" selected>Phase agents (5 extra calls, deepest)</option>
+              <option value="inline">Inline audit (no extra calls)</option>
+              <option value="off">Off</option>
+            </select>
+            <span class="mp-select-chev">
+              <svg viewBox="0 0 24 24" width="15" height="15" fill="none">
+                <path d="M6 9l6 6 6-6" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+            </span>
+          </div>
+        </div>
+
         <!-- Capraz-model konsensus denetimi (istege bagli, ekstra API cagrisi) -->
         <label class="mp-label tiny" id="consensusRow" style="display:flex; align-items:center; gap:6px; margin-top:10px; cursor:pointer;">
           <input type="checkbox" id="consensusCheckToggle" style="margin:0;">

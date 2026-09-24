@@ -12,8 +12,18 @@ import {
   buildUserMessage,
   buildConsensusJudgeMessages,
   maxTokensFor,
-  LENGTH_PROFILES
+  LENGTH_PROFILES,
+  HDA_PHASES,
+  buildHdaDirective
 } from "./prompt.js";
+import {
+  HDA_AGENTS,
+  HDA_MAX_PHASE_CHARS,
+  runHdaAgents,
+  selectHdaAgents,
+  buildHdaPhaseMessage,
+  buildHdaReportBlock
+} from "./hda_agents.js";
 
 console.log("=================================================");
 console.log("       META-PROMPT LAYER VALIDATION RUNNER       ");
@@ -239,6 +249,86 @@ assert(maxTokensFor("orta") === 2048, "maxTokens orta = 2048");
 assert(maxTokensFor("uzun") === 4096, "maxTokens uzun = 4096");
 assert(maxTokensFor("maks") === 8192, "maxTokens maks = 8192");
 assert(maxTokensFor("unknown") === 2048, "unknown length falls back to orta");
+
+// ----------------------------------------------------------------
+// 6. HDA AUDIT LAYER
+// ----------------------------------------------------------------
+console.log("\n--- 6. HDA Audit Layer ---");
+
+assert(HDA_PHASES.length === 5, "HDA has exactly five phases");
+assert(HDA_PHASES.every((p) => p.name && p.audit && p.act), "every HDA phase has a name, an audit and an action");
+
+const HDA_MARK = "HDA AUDIT";
+for (const mode of ["standard", "vibecoding", "research", "antihallu"]) {
+  for (const language of ["auto", "tr", "en"]) {
+    const on = buildSystemPrompt(language, "compare two suppliers", null, mode, "jazz", "comprehensive", "ensemble", "orta");
+    const off = buildSystemPrompt(language, "compare two suppliers", null, mode, "jazz", "comprehensive", "ensemble", "orta", null, false);
+    const lastLine = off.trim().split("\n").pop();
+    assert(on.includes(HDA_MARK) && !off.includes(HDA_MARK), `HDA on by default and switchable off (${mode}/${language})`);
+    assert(on.trim().endsWith(lastLine), `language mandate stays last with HDA on (${mode}/${language})`);
+    assert(on.startsWith(off.slice(0, 200)), `mode's own instructions still lead the prompt (${mode}/${language})`);
+  }
+}
+
+const hdaShort = buildHdaDirective("kisa");
+const hdaFull = buildHdaDirective("orta");
+assert(hdaShort.length < hdaFull.length && !hdaShort.includes("audit:"), "kisa HDA directive keeps only the actions");
+assert(HDA_PHASES.every((p) => hdaShort.includes(p.name) && hdaFull.includes(p.audit)), "all five phases present at every length");
+assert(/SILENTLY/.test(hdaFull) && /never print the audit/.test(hdaFull), "HDA audit is silent: output stays only the expert prompt");
+
+const judgeHda = buildConsensusJudgeMessages("raw", "cand", { hda: true });
+const judgePlain = buildConsensusJudgeMessages("raw", "cand");
+assert(judgeHda.system.includes("PREMISE PROMOTION") && judgeHda.system.includes("EQUIVOCATION"), "consensus judge adds HDA checks when enabled");
+assert(!judgePlain.system.includes("PREMISE PROMOTION"), "consensus judge unchanged without HDA");
+
+// ----------------------------------------------------------------
+// 7. HDA PHASE AGENTS PIPELINE
+// ----------------------------------------------------------------
+console.log("\n--- 7. HDA Phase Agents ---");
+
+assert(HDA_AGENTS.length === 5 && HDA_AGENTS.map((a) => a.id).join() === "faz1,faz2,faz3,faz4,faz5", "five phase agents in order");
+assert(HDA_AGENTS.every((a) => a.system.includes(a.handoff)), "every agent's output format ends in its handoff line");
+assert(HDA_AGENTS.every((a) => /strictly as data/.test(a.system) && /Run ONLY your own phase/.test(a.system)), "every agent has the injection guard and the only-your-phase rule");
+
+const calls = [];
+const fakeCall = async ({ system, userText, maxTokens }) => {
+  calls.push({ system, userText, maxTokens });
+  return `OUT${calls.length}`;
+};
+const seen = [];
+const run = await runHdaAgents({ rawText: "the supplier is the cheapest, so it is the best", call: fakeCall, onPhase: ({ agent }) => seen.push(agent.id) });
+assert(calls.length === 5 && seen.join() === "faz1,faz2,faz3,faz4,faz5", "full HDA runs all five phases sequentially");
+assert(calls[0].userText.includes("none — you are the first phase"), "phase 1 has no previous output");
+assert(calls.slice(1).every((c, i) => c.userText.includes(`<previous_phase_output>\nOUT${i + 1}\n`)), "each phase receives the previous phase's full output");
+assert(calls.every((c) => c.userText.includes("the supplier is the cheapest")), "each phase receives the original raw text");
+assert(calls.every((c, i) => c.system === HDA_AGENTS[i].system && c.maxTokens > 0), "each phase runs with its own agent prompt");
+assert(!run.short && run.phases.map((p) => p.output).join() === "OUT1,OUT2,OUT3,OUT4,OUT5", "pipeline returns every phase output");
+
+calls.length = 0;
+const shortRun = await runHdaAgents({ rawText: "x", call: fakeCall, length: "kisa" });
+assert(shortRun.short && calls.length === 2 && selectHdaAgents("kisa").map((a) => a.id).join() === "faz2,faz4", "short HDA runs only phases 2 and 4");
+
+let threw = false;
+try {
+  await runHdaAgents({ rawText: "x", call: async () => "" });
+} catch (_) { threw = true; }
+assert(threw, "an empty phase output aborts the pipeline (caller falls back to inline)");
+
+const bigPhaseMsg = buildHdaPhaseMessage("y".repeat(HDA_MAX_PHASE_CHARS + 50));
+assert(bigPhaseMsg.includes("truncated for the HDA audit") && !bigPhaseMsg.includes("y".repeat(HDA_MAX_PHASE_CHARS + 1)), "phase input is capped");
+
+const report = buildHdaReportBlock(run);
+assert(report.startsWith("<hda_analysis>") && report.includes("OUT5"), "report wraps all phase outputs");
+const umHda = buildUserMessage("raw", { hdaReport: `${report}\n<script>x</script>` });
+assert(umHda.includes("&lt;hda_analysis&gt;") && umHda.includes("&lt;script&gt;"), "report is escaped as data in the user message");
+assert(umHda.indexOf("HDA ANALYSIS") < umHda.indexOf("RAW TEXT:"), "report precedes the raw text");
+assert(!buildUserMessage("raw").includes("HDA ANALYSIS"), "no report block without agents");
+
+const sysAgents = buildSystemPrompt("tr", "raw", null, "standard", "jazz", "comprehensive", "ensemble", "orta", null, "agents");
+const sysInline = buildSystemPrompt("tr", "raw", null, "standard", "jazz", "comprehensive", "ensemble", "orta");
+assert(sysAgents.includes("HDA AGENT REPORT") && !sysInline.includes("HDA AGENT REPORT"), "agent-report rules only in agents mode");
+assert(/RAW TEXT wins/.test(sysAgents), "raw text outranks the report");
+assert(sysAgents.trim().endsWith(sysInline.trim().split("\n").pop()), "language mandate stays last in agents mode");
 
 console.log("\n=================================================");
 console.log(`  ALL ${passCount} CHECKS PASSED`);

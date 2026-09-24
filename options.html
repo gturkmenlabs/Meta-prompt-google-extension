@@ -174,6 +174,22 @@
 
       <div class="ms-div"></div>
 
+      <!-- Semantic cache: repeated or reworded prompts are answered locally -->
+      <div class="ms-field">
+        <label class="ms-label">Semantic cache</label>
+        <span class="ms-hint" style="display:block; margin-top:2px;">
+          Repeated or reworded prompts with the same settings are answered from
+          the local cache instead of calling the API again
+          (<span id="semanticCacheCount">…</span> cached).
+        </span>
+        <div style="margin-top:8px; display:flex; gap:8px; align-items:center;">
+          <button class="ms-btn ghost" id="clearSemanticCacheBtn" type="button">Clear semantic cache</button>
+          <div class="ms-hint" id="semanticCacheResult" role="status" aria-live="polite"></div>
+        </div>
+      </div>
+
+      <div class="ms-div"></div>
+
       <!-- Test connection -->
       <div class="ms-field">
         <button class="ms-btn ghost" id="testBtn" type="button">

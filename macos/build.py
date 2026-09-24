@@ -13,7 +13,8 @@ web.mkdir(parents=True, exist_ok=True)
 (contents / "MacOS").mkdir(exist_ok=True)
 for name in ["popup.html", "options.html", "popup.css", "options.css", "theme.css",
              "popup.js", "options.js", "api.js", "config.js", "prompt.js",
-             "background.js", "brain_network.js", "brain_helper.js", "typesafe.js"]:
+             "background.js", "brain_network.js", "brain_helper.js", "typesafe.js",
+             "hda_agents.js", "efficiency.js"]:
     shutil.copy2(root / name, web / name)
 shutil.copy2(root / "macos" / "desktop.js", web / "desktop.js")
 shutil.copy2(root / "macos" / "accounts.js", web / "accounts.js")

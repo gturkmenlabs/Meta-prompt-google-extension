@@ -3,6 +3,7 @@ import {
   TYPESAFE_KEY_FIELD, TYPESAFE_ENABLED_KEY, TYPESAFE_MIN_CONFIDENCE_KEY
 } from "./config.js";
 import { fetchOpenRouterModels, revise } from "./api.js";
+import { clearSemanticCache, getSemanticCacheStats } from "./efficiency.js";
 import { testTypesafeKey, DEFAULT_MIN_CONFIDENCE, MAX_CLASSIFY_CHARS } from "./typesafe.js";
 
 document.addEventListener("DOMContentLoaded", async () => {
@@ -102,6 +103,35 @@ document.addEventListener("DOMContentLoaded", async () => {
       } finally {
         typesafeTestBtn.disabled    = false;
         typesafeTestBtn.textContent = original;
+      }
+    });
+  }
+
+  // ——— Semantic cache (counter + clear) ———
+  const semanticCacheCount  = document.getElementById("semanticCacheCount");
+  const clearCacheBtn       = document.getElementById("clearSemanticCacheBtn");
+  const semanticCacheResult = document.getElementById("semanticCacheResult");
+  const refreshCacheCount = async () => {
+    if (!semanticCacheCount) return;
+    try {
+      const { entries, maxEntries } = await getSemanticCacheStats();
+      semanticCacheCount.textContent = `${entries}/${maxEntries}`;
+    } catch (_) {
+      semanticCacheCount.textContent = "n/a";
+    }
+  };
+  await refreshCacheCount();
+  if (clearCacheBtn) {
+    clearCacheBtn.addEventListener("click", async () => {
+      clearCacheBtn.disabled = true;
+      try {
+        await clearSemanticCache();
+        await refreshCacheCount();
+        if (semanticCacheResult) semanticCacheResult.textContent = "Cache cleared ✓";
+      } catch (error) {
+        if (semanticCacheResult) semanticCacheResult.textContent = `Could not clear: ${error.message}`;
+      } finally {
+        clearCacheBtn.disabled = false;
       }
     });
   }
