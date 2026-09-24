@@ -45,6 +45,7 @@ Meta-Prompt transforms raw user thoughts, drafts, and queries in real time into 
   - Immediate failover halt on authentication errors (401/403).
 - **HDA Thinking Algorithm**: A five-phase audit (epistemic filter, conceptual analysis, intentionality check, rational inference, hylomorphic synthesis) runs on every revision — either as five sequential phase agents (default, deepest) or as a single inline directive with no extra calls. If a phase agent fails, the revision falls back to the inline audit instead of stopping.
 - **Efficiency Layer**: A local semantic cache (50 entries, 24 h TTL) returns repeated requests without an API call; system prompts are compressed only when every protected rule survives; long Anthropic system prompts use prompt-cache breakpoints on the stable prefix.
+- **Claude Code Command Prompts**: Start the text with a Claude Code command (`/plan`, `/review --fix`, `/goal`, `/simplify`, `/compact`, `/btw`, `/batch`, `/loop`, `/init`, `/doctor`, or `claude -w`) and the engine writes a ready-to-type prompt for that command — command line first, then scope, steps, constraints and a verification command. Works in every mode. Templates: [claude-code-prompt-system.md](claude-code-prompt-system.md).
 - **Optional TypeSafe Task Classification**: Off by default. When enabled in Settings, the first 2,000 characters are sent to TypeSafe to pick the task type; any failure or low confidence falls back to the keyword classifier.
 
 ---
@@ -143,6 +144,7 @@ In addition to the browser extension, this repository contains a standalone Appl
 ├── brain_helper.js          # SNN persistence, modulator integration, synaptic reward
 ├── hda_agents.js            # HDA five-phase audit agents with inline fallback
 ├── efficiency.js            # Semantic cache, safe prompt compression, KV prefix caching
+├── claude_commands.js       # Claude Code command detection and prompt templates
 ├── typesafe.js              # Optional TypeSafe task classifier (opt-in, fail-open)
 ├── popup.html / popup.js    # Browser action popup UI & streaming port bridge
 ├── popup.css                # Extension popup layout and styling
@@ -150,7 +152,7 @@ In addition to the browser extension, this repository contains a standalone Appl
 ├── options.css              # Settings layout styling
 ├── theme.css                # Shared design system (warm neutral & forest-green palette)
 ├── package.json             # Test runner configuration (npm test)
-├── verify_prompt.js         # 184 structural, bilingual & HDA prompt checks
+├── verify_prompt.js         # 202 structural, bilingual, HDA & Claude Code command checks
 ├── verify_brain.js          # SNN biophysical unit tests, benchmarks, stress tests
 ├── verify_runtime.mjs       # Mock-based runtime failover, undo, & isolation tests
 ├── verify_efficiency.js     # Semantic cache, compression & KV caching checks
@@ -206,7 +208,7 @@ npm test
 ```
 
 This runs the comprehensive verification suite:
-- **`npm run test:prompt`**: 184 prompt structure tests, bilingual English & Turkish task classifiers, HDA directive and phase agents, token boundaries, and anti-injection sanitization.
+- **`npm run test:prompt`**: 202 prompt structure tests, bilingual English & Turkish task classifiers, HDA directive and phase agents, Claude Code command detection, token boundaries, and anti-injection sanitization.
 - **`npm run test:brain`**: SNN neuron membrane dynamics, Tsodyks-Markram plasticity, STDP pruning, serialization round-trips, and 10,000-step latency benchmarks.
 - **`npm run test:runtime`**: API key isolation, failover limits, SSE stream recovery, target element locking, and TypeSafe opt-in / fail-open behavior.
 - **`npm run test:desktop`**: Native Swift/JS message bridges, Unicode clipboard buffers, stream cancellation, and the macOS build file list.

@@ -91,5 +91,17 @@ ok(!cacheable[cacheable.length - 1].cache_control, "dynamic tail stays uncached"
 ok(flattenCacheableBlocks(cacheable).includes("intro one"), "blocks flatten for string-only providers");
 ok(prefixCacheKey("a\n\nb\n\nc\n\nd") === prefixCacheKey("a\n\nb\n\nc\n\nDIFFERENT TAIL"), "prefix key ignores the dynamic tail");
 
+// A Claude Code command is part of the cache config: a near-duplicate with a
+// different (or no) command must not reuse the other prompt.
+await clearSemanticCache();
+const longTask = "add google oauth login to the auth module and keep the existing session cookies working for all current users";
+const ccBase = { language: "en", length: "orta", mode: "standard" };
+await semanticCacheStore(longTask, { ...ccBase, claudeCommand: "" }, { result: "PLAIN PROMPT" });
+ok(semanticSimilarity(longTask, "/plan " + longTask) >= 0.92, "the /plan variant is a Jaccard near-duplicate");
+ok(await semanticCacheLookup("/plan " + longTask, { ...ccBase, claudeCommand: "plan" }) === null, "a command does not reuse the plain-text cache entry");
+await semanticCacheStore("/plan " + longTask, { ...ccBase, claudeCommand: "plan" }, { result: "PLAN PROMPT" });
+ok(await semanticCacheLookup("/review " + longTask, { ...ccBase, claudeCommand: "review" }) === null, "different commands do not share a cache entry");
+ok((await semanticCacheLookup("/plan  " + longTask, { ...ccBase, claudeCommand: "plan" }))?.result === "PLAN PROMPT", "the same command still hits the cache");
+
 await clearSemanticCache();
 console.log(`\nEfficiency checks passed: ${pass} assertions.`);

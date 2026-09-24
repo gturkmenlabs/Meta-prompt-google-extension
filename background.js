@@ -8,6 +8,7 @@ import { classifyTaskType } from "./typesafe.js";
 import { buildSystemPrompt, buildUserMessage, buildConsensusJudgeMessages, maxTokensFor, detectTaskType, resolveAutoStrategy } from "./prompt.js";
 import { runBrainSimulation } from "./brain_helper.js";
 import { runHdaAgents, buildHdaReportBlock } from "./hda_agents.js";
+import { detectClaudeCodeCommand } from "./claude_commands.js";
 import { semanticCacheLookup, semanticCacheStore, compressSystemPrompt } from "./efficiency.js";
 
 const MENU_TO_POPUP = "revizeMetaPrompt";
@@ -238,7 +239,7 @@ async function reviseInPlace(tab, selectionText = "") {
 
     const typesafeTaskType = await resolveStandardTaskType(mode, text);
 
-    const inPlaceCacheConfig = cacheConfigFor({
+    const inPlaceCacheConfig = cacheConfigFor(text, {
       language, length, mode, vibeStrategy, researchStrategy, antihalluStrategy,
       taskTypeOverride: typesafeTaskType, hdaMode
     });
@@ -407,8 +408,11 @@ async function handleRewardBrainMessage(message, sendResponse) {
 //   1. semantic cache lookup (repeated queries never reach SNN/HDA/API),
 //   2. SNN tick + HDA agents,
 //   3. Psi-safe compression of the assembled system prompt.
-function cacheConfigFor({ language, length, mode, vibeStrategy, researchStrategy, antihalluStrategy, taskTypeOverride = null, hdaMode = "agents" }) {
-  return { language, length, mode, vibeStrategy, researchStrategy, antihalluStrategy, taskTypeOverride, hda: hdaMode };
+// The Claude Code command is part of the config: without it a near-duplicate text
+// with or without "/plan" (or with a different command) would share a cache entry.
+function cacheConfigFor(rawText, { language, length, mode, vibeStrategy, researchStrategy, antihalluStrategy, taskTypeOverride = null, hdaMode = "agents" }) {
+  const claudeCommand = detectClaudeCodeCommand(rawText)?.id || "";
+  return { language, length, mode, vibeStrategy, researchStrategy, antihalluStrategy, taskTypeOverride, hda: hdaMode, claudeCommand };
 }
 
 const SYSTEM_COMPRESSION_BUDGET = { kisa: 4000, orta: 8000, uzun: 12000, maks: 20000 };
@@ -444,7 +448,7 @@ async function prepareRevision(message, { onPhase = null } = {}) {
   // 0) Outermost semantic cache: identical or near-duplicate queries with the
   // same config short-circuit before SNN, HDA agents, or any model call.
   try {
-    const cacheConfig = cacheConfigFor({
+    const cacheConfig = cacheConfigFor(rawText, {
       language, length, mode, vibeStrategy, researchStrategy, antihalluStrategy,
       taskTypeOverride: typesafeTaskType, hdaMode
     });
@@ -483,7 +487,7 @@ async function prepareRevision(message, { onPhase = null } = {}) {
   });
 
   const rawSystem = buildSystemPrompt(language, rawText, snnValues, mode, vibeStrategy, researchStrategy, antihalluStrategy, length, typesafeTaskType, hda);
-  const cacheConfig = cacheConfigFor({
+  const cacheConfig = cacheConfigFor(rawText, {
     language, length, mode, vibeStrategy, researchStrategy, antihalluStrategy,
     taskTypeOverride: typesafeTaskType, hdaMode
   });
