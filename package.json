@@ -2,16 +2,18 @@
   "name": "meta-prompt-engine",
   "version": "2.5.0",
   "private": true,
-  "description": "Chrome MV3 extension and macOS app that rewrite raw text into expert prompts.",
+  "description": "Web app that rewrites raw text into expert prompts with your own Anthropic or OpenRouter key.",
   "type": "module",
   "scripts": {
-    "test": "npm run test:prompt && npm run test:brain && npm run test:runtime && npm run test:desktop && npm run test:efficiency",
+    "start": "node web/server.mjs",
+    "test": "npm run test:prompt && npm run test:brain && npm run test:runtime && npm run test:efficiency && npm run test:memory && npm run test:placeholders && npm run test:web",
     "test:prompt": "node verify_prompt.js",
     "test:brain": "node verify_brain.js",
     "test:runtime": "node verify_runtime.mjs",
-    "test:desktop": "node macos/verify_desktop.mjs",
     "test:efficiency": "node verify_efficiency.js",
-    "build:macos": "python3 macos/build.py"
+    "test:memory": "node verify_memory.mjs",
+    "test:placeholders": "node verify_placeholders.mjs",
+    "test:web": "node verify_web.mjs"
   },
   "engines": {
     "node": ">=18"

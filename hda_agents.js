@@ -8,8 +8,8 @@
 // (see buildHdaReportBlock), which writes the final prompt with it.
 //
 // The pipeline is transport-agnostic: the caller supplies `call`, so this file
-// imports nothing and runs unchanged in the extension, the desktop app and the
-// offline checks. Any failure throws; background.js catches it and falls back
+// imports nothing and runs unchanged in the web app and the
+// offline checks. Any failure throws; engine.js catches it and falls back
 // to the single-pass inline HDA directive, so a phase outage never blocks a
 // revision.
 

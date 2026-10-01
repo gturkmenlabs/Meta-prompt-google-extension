@@ -23,9 +23,10 @@ import {
   applyPyramidRetention,
   toCacheableSystemBlocks,
   flattenCacheableBlocks,
-  prefixCacheKey
+  prefixCacheKey,
+  configFingerprint
 } from "./efficiency.js";
-import { buildSystemBase, CONCISE_REASONING_GUARD } from "./prompt.js";
+import { buildSystemBase, buildSystemPrompt, CONCISE_REASONING_GUARD } from "./prompt.js";
 
 let pass = 0;
 const ok = (condition, message) => {
@@ -62,6 +63,15 @@ ok(compressed.psi >= 1 && compressed.protectedSurvival >= 1, "Psi stays high (pr
 ok(compressed.text.includes("[BRACKETED_PLACEHOLDER]"), "fidelity rule survives compression");
 ok(compressed.text.includes("CONCISE REASONING"), "anti-overthinking guard survives compression");
 ok(compressed.text.length < longSystem.length, "redundant filler is pruned");
+const explainSystem = buildSystemBase("explain simply what quantum entanglement is", null, "orta");
+const feynLine = explainSystem.split("\n").find((line) => line.includes("FEYNMAN TEACHING"));
+ok(Boolean(feynLine) && isProtectedLine(feynLine), "Feynman teaching line is protected");
+const explainCompressed = compressSystemPrompt(`${explainSystem}\n${"This is just a very really filler line.\n".repeat(200)}`, { maxChars: Math.floor(explainSystem.length / 2) });
+ok(explainCompressed.text.includes(feynLine) && explainCompressed.psi === 1, "Feynman line survives compression with Psi = 1");
+const codingClarity = buildSystemBase("write code that reads a csv in python", null, "orta").split("\n").find((line) => line.includes("FEYNMAN CLARITY"));
+ok(Boolean(codingClarity) && isProtectedLine(codingClarity), "Feynman clarity line is protected");
+const cavemanRule = system.split("\n").find((line) => line.includes("CAVEMAN OUTPUT"));
+ok(Boolean(cavemanRule) && isProtectedLine(cavemanRule) && compressed.text.includes(cavemanRule), "Caveman line is protected and survives compression");
 ok(estimatePsi(["keep [BRACKETED_PLACEHOLDER]", "drop me"], ["keep [BRACKETED_PLACEHOLDER]"]) === 1, "Psi estimator counts protected survival");
 const short = compressSystemPrompt("short system", { maxChars: 6000 });
 ok(short.changed === false && short.psi === 1, "short prompts pass through untouched");
@@ -90,6 +100,22 @@ ok(cacheable[0].cache_control?.type === "ephemeral", "stable prefix gets KV cach
 ok(!cacheable[cacheable.length - 1].cache_control, "dynamic tail stays uncached");
 ok(flattenCacheableBlocks(cacheable).includes("intro one"), "blocks flatten for string-only providers");
 ok(prefixCacheKey("a\n\nb\n\nc\n\nd") === prefixCacheKey("a\n\nb\n\nc\n\nDIFFERENT TAIL"), "prefix key ignores the dynamic tail");
+
+// 5. Agent CLI mode: the command catalog and safety rule survive the engine's
+// compression budgets (kisa 4000 / orta 8000 chars, accepted only at Psi = 1),
+// and the agent target is part of the cache fingerprint.
+for (const [target, length, maxChars] of [["claudecode", "kisa", 4000], ["claudecode", "orta", 8000], ["codex", "kisa", 4000], ["codex", "orta", 8000]]) {
+  const sys = buildSystemPrompt("tr", "fix the failing login tests", null, "agentcli", null, null, null, length, null, "agents", target);
+  const keep = sys.split("\n").filter((line) => /^AGENT (CMD|SAFETY|RULE):/.test(line));
+  const { text, psi } = compressSystemPrompt(sys, { maxChars });
+  const sent = sys.length <= maxChars || psi < 1 ? sys : text;
+  ok(keep.length >= 16 && keep.every((line) => sent.includes(line)), `agent catalog, safety and core rules survive compression (${target}/${length})`);
+  ok(["You do NOT do the coding task yourself", "Use ONLY commands, flags and prefixes", "headless form", "never invent them", "no code fences"].every((rule) => sent.includes(rule)),
+    `agent role, closed-list, headless, placeholder and no-fence rules are sent (${target}/${length})`);
+}
+const agentBase = { language: "tr", length: "orta", mode: "agentcli", hda: "agents" };
+ok(configFingerprint({ ...agentBase, agentTarget: "codex" }) !== configFingerprint({ ...agentBase, agentTarget: "claudecode" }), "agent target is part of the cache fingerprint");
+ok(configFingerprint({ ...agentBase, mode: "standard", agentTarget: "codex" }) === configFingerprint({ ...agentBase, mode: "standard" }), "other modes keep their old cache keys");
 
 await clearSemanticCache();
 console.log(`\nEfficiency checks passed: ${pass} assertions.`);

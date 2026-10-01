@@ -40,8 +40,10 @@ export function hashString(text) {
   return (hash >>> 0).toString(16).padStart(8, "0");
 }
 
-export function configFingerprint({ language = "auto", length = "orta", mode = "standard", vibeStrategy = "", researchStrategy = "", antihalluStrategy = "", taskTypeOverride = null, hda = true } = {}) {
-  return [language, length, mode, vibeStrategy || "", researchStrategy || "", antihalluStrategy || "", taskTypeOverride || "", String(hda)].join("|");
+export function configFingerprint({ language = "auto", length = "orta", mode = "standard", vibeStrategy = "", researchStrategy = "", antihalluStrategy = "", taskTypeOverride = null, hda = true, memory = false, agentTarget = "" } = {}) {
+  // `memory` and `agentTarget` are appended only when in use, so keys cached
+  // before they existed stay valid.
+  return [language, length, mode, vibeStrategy || "", researchStrategy || "", antihalluStrategy || "", taskTypeOverride || "", String(hda), ...(memory ? ["memory"] : []), ...(mode === "agentcli" && agentTarget ? [`agent:${agentTarget}`] : [])].join("|");
 }
 
 export function getSemanticCacheKey(rawText, config = {}) {
@@ -183,6 +185,11 @@ export const PROTECTED_PATTERNS = [
   /NEUTRAL FRAMING/i,
   /CONSTRAINTS/i,
   /CONCISE REASONING/i,
+  /FEYNMAN (TEACHING|CLARITY)/i,
+  /CAVEMAN OUTPUT/i,
+  /AGENT CMD:/,
+  /AGENT SAFETY:/,
+  /AGENT RULE:/,
   /anti-overthinking/i,
   /^ROLE[:\s]/i,
   /^TASK[:\s]/i,
