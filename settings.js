@@ -4,6 +4,7 @@ import {
 } from "./config.js";
 import { fetchOpenRouterModels, revise } from "./api.js";
 import { clearSemanticCache, getSemanticCacheStats } from "./efficiency.js";
+import { MEMORY_ENABLED_KEY, MEMORY_MAX_NODES, clearMemory, getMemoryStats } from "./memory.js";
 import { testTypesafeKey, DEFAULT_MIN_CONFIDENCE, MAX_CLASSIFY_CHARS } from "./typesafe.js";
 
 document.addEventListener("DOMContentLoaded", async () => {
@@ -33,8 +34,8 @@ document.addEventListener("DOMContentLoaded", async () => {
   const typesafeMaxChars      = document.getElementById("typesafeMaxChars");
 
   // ——— Cross-provider fallback (opt-in) ———
-  // Persisted on change, like the popup toggles, so it applies to the shortcut
-  // and context-menu paths too without needing Save.
+  // Persisted on change, like the studio toggles, so it applies without
+  // needing Save.
   if (maxBackupCount) maxBackupCount.textContent = String(MAX_BACKUP_MODELS);
   if (crossProviderToggle) {
     const savedFallback = await chrome.storage.local.get(CROSS_PROVIDER_FALLBACK_KEY);
@@ -46,7 +47,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   // ——— TypeSafe task classification (opt-in) ———
   // The toggle and threshold persist on change, like the cross-provider toggle,
-  // so the shortcut and context-menu paths pick them up without a Save. The key
+  // so the studio picks them up without a Save. The key
   // itself goes through Save with the provider keys.
   if (typesafeMaxChars) typesafeMaxChars.textContent = String(MAX_CLASSIFY_CHARS);
   const typesafeStored = await chrome.storage.local.get([
@@ -106,6 +107,39 @@ document.addEventListener("DOMContentLoaded", async () => {
       }
     });
   }
+
+  // ——— Mnemonist memory (opt-in; persisted on change like the toggles above) ———
+  const memoryToggle   = document.getElementById("memoryToggle");
+  const memoryCount    = document.getElementById("memoryCount");
+  const memoryMax      = document.getElementById("memoryMax");
+  const clearMemoryBtn = document.getElementById("clearMemoryBtn");
+  const memoryResult   = document.getElementById("memoryResult");
+  memoryMax.textContent = String(MEMORY_MAX_NODES);
+  const refreshMemoryCount = async () => {
+    try {
+      memoryCount.textContent = String((await getMemoryStats()).active);
+    } catch (_) {
+      memoryCount.textContent = "n/a";
+    }
+  };
+  const memoryStored = await chrome.storage.local.get(MEMORY_ENABLED_KEY);
+  memoryToggle.checked = memoryStored[MEMORY_ENABLED_KEY] === true;
+  memoryToggle.addEventListener("change", () =>
+    chrome.storage.local.set({ [MEMORY_ENABLED_KEY]: memoryToggle.checked })
+  );
+  await refreshMemoryCount();
+  clearMemoryBtn.addEventListener("click", async () => {
+    clearMemoryBtn.disabled = true;
+    try {
+      await clearMemory();
+      await refreshMemoryCount();
+      memoryResult.textContent = "Memory cleared ✓";
+    } catch (error) {
+      memoryResult.textContent = `Could not clear: ${error.message}`;
+    } finally {
+      clearMemoryBtn.disabled = false;
+    }
+  });
 
   // ——— Semantic cache (counter + clear) ———
   const semanticCacheCount  = document.getElementById("semanticCacheCount");

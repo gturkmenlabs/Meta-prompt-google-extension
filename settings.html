@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https://api.anthropic.com https://openrouter.ai https://api.typesafe.ai; base-uri 'none'; form-action 'none'; object-src 'none'">
+  <meta name="referrer" content="no-referrer">
+  <title>MetaPrompt — Settings</title>
+  <link rel="icon" href="icons/icon.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&family=Geist+Mono:wght@400&display=swap">
+  <link rel="stylesheet" href="web/app.css">
+  <script src="web/shim.js"></script>
+  <script type="module" src="settings.js"></script>
+</head>
+<body>
+  <header class="wrap nav">
+    <a class="brand" href="index.html" aria-label="MetaPrompt home">
+      <svg width="22" height="22" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"><path d="M12 3 L21 19 L3 19 Z"/><path d="M12 9 L16.5 17 L7.5 17 Z"/></svg>
+      <span class="brand-word">MetaPrompt</span>
+    </a>
+    <nav class="nav-links" aria-label="Primary">
+      <a class="ghost-link" href="index.html">Studio</a>
+      <a class="ghost-link" href="settings.html" aria-current="page">Settings</a>
+    </nav>
+  </header>
+
+  <main class="wrap settings">
+    <div class="settings-grid">
+      <div class="settings-intro">
+        <h1 class="heading-lg">Your models. Your way of working.</h1>
+        <div style="display:flex; flex-direction:column; gap:12px">
+          <span class="eyebrow">A direct connection</span>
+          <p class="body">Connect a provider and choose the model behind your prompts. Your key stays in this browser and is used only to authenticate with that provider.</p>
+          <p class="body muted">Keys are stored as plain text in this browser's storage — be careful on shared computers.</p>
+        </div>
+      </div>
+
+      <div class="ms-body">
+        <!-- Provider, key, model -->
+        <div class="ms-group">
+          <div class="ms-field">
+            <span class="ms-label" id="providerLabel">Provider</span>
+            <div class="ms-seg" id="providerSeg" role="group" aria-labelledby="providerLabel">
+              <button class="ms-seg-btn on" type="button" data-provider="anthropic">Anthropic</button>
+              <button class="ms-seg-btn" type="button" data-provider="openrouter">OpenRouter</button>
+            </div>
+            <select id="provider" hidden aria-hidden="true" tabindex="-1">
+              <option value="anthropic">Anthropic</option>
+              <option value="openrouter">OpenRouter</option>
+            </select>
+          </div>
+
+          <div class="ms-field">
+            <label class="ms-label" for="apiKey">API key</label>
+            <div class="ms-input-wrap">
+              <input class="ms-input mono" id="apiKey" type="password" placeholder="sk-ant-api03-…" autocomplete="off" spellcheck="false">
+              <button class="ms-show-btn" id="showKeyBtn" type="button">Show</button>
+            </div>
+          </div>
+
+          <div class="ms-field">
+            <label class="ms-label" for="model">Model</label>
+            <div class="ms-input-wrap">
+              <input class="ms-input" id="model" list="modelList" placeholder="model ID" autocomplete="off" spellcheck="false">
+              <datalist id="modelList"></datalist>
+            </div>
+            <div class="ms-hint" id="modelHint"></div>
+
+            <select id="tierSelect" aria-label="Model pricing tier">
+              <option value="free">Free models</option>
+              <option value="paid">Paid models</option>
+              <option value="all">All models</option>
+            </select>
+            <div class="ms-tools">
+              <button id="loadFreeBtn" type="button">Load OpenRouter models</button>
+              <button id="verifyBtn" type="button">Test and add working ones</button>
+            </div>
+            <select id="modelSelect" aria-label="Available models">
+              <option value="">— Select from free models —</option>
+            </select>
+            <div class="ms-hint" id="freeHint"></div>
+          </div>
+        </div>
+
+        <!-- Cross-provider fallback -->
+        <div class="ms-group">
+          <label class="ms-check" for="crossProviderToggle">
+            <input type="checkbox" id="crossProviderToggle">
+            <span>
+              <strong>Allow backup models from the other provider</strong>
+              <span class="ms-hint">Off by default. When on and the active provider fails, your source text is sent to verified models on the other provider instead. At most <span id="maxBackupCount">3</span> backup models are tried per revision.</span>
+            </span>
+          </label>
+        </div>
+
+        <!-- TypeSafe -->
+        <div class="ms-group">
+          <label class="ms-check" for="typesafeToggle">
+            <input type="checkbox" id="typesafeToggle">
+            <span>
+              <strong>Classify the task with TypeSafe</strong>
+              <span class="ms-hint">Off by default. The prompt brain normally guesses your task type from keywords. When on, the first <span id="typesafeMaxChars">2000</span> characters of your text are sent to TypeSafe, whose answer picks the prompt modules instead. Low-confidence or failed answers fall back to the keyword guess, so revisions never break.</span>
+            </span>
+          </label>
+
+          <div class="ms-field">
+            <label class="ms-label" for="typesafeKey">TypeSafe API key</label>
+            <div class="ms-input-wrap">
+              <input class="ms-input mono" id="typesafeKey" type="password" placeholder="apikey_…" autocomplete="off" spellcheck="false">
+              <button class="ms-show-btn" id="showTypesafeKeyBtn" type="button">Show</button>
+            </div>
+            <div class="ms-hint">Stored as plain text in this browser, like your provider key.</div>
+          </div>
+
+          <div class="ms-field">
+            <label class="ms-label" for="typesafeMinConfidence">Minimum confidence</label>
+            <div class="ms-input-wrap">
+              <input class="ms-input" id="typesafeMinConfidence" type="number" min="0.1" max="1" step="0.05">
+            </div>
+            <div class="ms-hint">Below this, the keyword guess is kept. Raise it if TypeSafe picks the wrong task type; lower it if it rarely takes over.</div>
+          </div>
+
+          <div class="ms-field">
+            <button class="ms-btn ghost" id="typesafeTestBtn" type="button">Test TypeSafe →</button>
+            <div class="ms-hint" id="typesafeTestResult" role="status" aria-live="polite"></div>
+          </div>
+        </div>
+
+        <!-- Mnemonist memory -->
+        <div class="ms-group">
+          <label class="ms-check" for="memoryToggle">
+            <input type="checkbox" id="memoryToggle">
+            <span>
+              <strong>Remember related prompts</strong>
+              <span class="ms-hint">Off by default. When on, each finished prompt is remembered in this browser (up to <span id="memoryMax">100</span>). A new request that shares enough words with earlier ones gets up to three of them as background, so the prompt keeps your usual format, tone and audience. Those earlier requests are sent to your provider with the new one. Keys, emails and passwords are masked; the rest is stored as plain text. Deleting a history entry forgets it here too.</span>
+            </span>
+          </label>
+          <div class="ms-field">
+            <span class="ms-hint"><span id="memoryCount">…</span> prompts remembered.</span>
+            <div class="ms-tools">
+              <button class="ms-btn ghost" id="clearMemoryBtn" type="button">Clear memory</button>
+              <div class="ms-hint" id="memoryResult" role="status" aria-live="polite"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Semantic cache -->
+        <div class="ms-group">
+          <div class="ms-field">
+            <span class="ms-label">Semantic cache</span>
+            <span class="ms-hint">Repeated or reworded prompts with the same settings are answered from the local cache instead of calling the API again (<span id="semanticCacheCount">…</span> cached).</span>
+            <div class="ms-tools">
+              <button class="ms-btn ghost" id="clearSemanticCacheBtn" type="button">Clear semantic cache</button>
+              <div class="ms-hint" id="semanticCacheResult" role="status" aria-live="polite"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Test and save -->
+        <div class="ms-group">
+          <div class="ms-field">
+            <button class="ms-btn ghost" id="testBtn" type="button">Test connection →</button>
+            <div class="ms-hint" id="testResult" role="status" aria-live="polite"></div>
+          </div>
+          <div class="ms-field">
+            <button class="ms-btn accent" id="saveBtn" type="button">Save settings</button>
+            <div id="saved" role="status" aria-live="polite"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <footer class="wrap footer">
+    <span>MetaPrompt · settings</span>
+    <span><a href="index.html">Back to the studio</a></span>
+  </footer>
+</body>
+</html>

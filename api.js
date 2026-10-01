@@ -191,7 +191,7 @@ export async function revise({ provider, apiKey, apiKeys, model, system, userTex
 
 // ============================================================================
 // STREAMING (SSE)
-// So the popup can show the revision result as it is generated. Both
+// So the studio can show the revision result as it is generated. Both
 // providers support streaming in Server-Sent Events format; the line formats
 // differ (Anthropic: content_block_delta, OpenRouter: OpenAI-style delta).
 // ============================================================================

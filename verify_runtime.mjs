@@ -1,6 +1,4 @@
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
-import vm from 'node:vm';
 import { revise, reviseStreamWithFailover } from './api.js';
 import { getFailoverConfig, getActiveConfig, MAX_BACKUP_MODELS } from './config.js';
 
@@ -50,35 +48,9 @@ calls = 0;
 globalThis.fetch = async () => calls === 0 ? (calls++, new Response('busy', {status:503})) : serve(delta + 'data: [DONE]\n');
 assert.equal((await reviseStreamWithFailover(params)).fellBack, true);
 
-let listener;
-class Field {
-  constructor(value) { this.value = value; this.nodeType = 1; this.tagName = 'TEXTAREA'; }
-  focus() {} select() {} dispatchEvent() {}
-}
-Object.defineProperty(Field.prototype, 'value', {get() { return this.text; }, set(v) { this.text = v; }});
-const first = new Field('original');
-const second = new Field('other');
-const document = {activeElement:first, contains:()=>true, addEventListener(){}, execCommand:()=>false};
-vm.runInNewContext(readFileSync(new URL('./content.js', import.meta.url), 'utf8'), {
-  document, Event, HTMLTextAreaElement:Field, HTMLInputElement:Field,
-  chrome:{runtime:{onMessage:{addListener(fn){listener=fn;}}}}
-});
-const send = (msg) => {let response; listener(msg, {}, (r)=>response=r); return response;};
-send({type:'GET_EDITABLE_TEXT',captureTarget:true});
-document.activeElement = second;
-assert.equal(send({type:'STREAM_EDITABLE_TEXT',text:'partial'}).ok,true);
-assert.equal(first.value,'partial');
-assert.equal(second.value,'other');
-send({type:'END_EDITABLE_STREAM'});
-assert.equal(send({type:'RESTORE_EDITABLE_TEXT'}).ok,true);
-assert.equal(first.value,'original');
-send({type:'GET_EDITABLE_TEXT',captureTarget:true});
-second.value='user edit';
-assert.equal(send({type:'STREAM_EDITABLE_TEXT',text:'replacement'}).ok,false);
-assert.equal(second.value,'user edit');
 // ——— TypeSafe task classifier ———
 // The classifier is optional and must fail open: every rejection path below has
-// to leave the caller with null, which background.js reads as "use keywords".
+// to leave the caller with null, which engine.js reads as "use keywords".
 const {
   classifyTaskType, readChoiceAnswer, buildClassifyRequest, MAX_CLASSIFY_CHARS, DEFAULT_MIN_CONFIDENCE, TYPESAFE_API_URL
 } = await import('./typesafe.js');
@@ -153,4 +125,4 @@ assert.equal(
     'standard', 'jazz', 'comprehensive', 'ensemble', 'orta', 'bogus'),
   coding, 'An unknown override is ignored');
 
-console.log('Runtime checks passed: configuration, key isolation, fragmented UTF-8 streams, premature EOF, upstream errors, failover, target locking, partial undo, user edits, TypeSafe opt-in and fail-open classification.');
+console.log('Runtime checks passed: configuration, key isolation, fragmented UTF-8 streams, premature EOF, upstream errors, failover, TypeSafe opt-in and fail-open classification.');

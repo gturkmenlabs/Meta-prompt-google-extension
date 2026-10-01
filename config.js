@@ -74,8 +74,7 @@ export async function getActiveConfig() {
 }
 
 // Full failover plan: active model + backup model list + all keys.
-// Both the popup (REVISE_PROMPT) and the shortcut/right-click (reviseInPlace)
-// paths use this, so the model-list logic stays in one place.
+// Both revision paths in engine.js (the stream port and REVISE_PROMPT) use this, so the model-list logic stays in one place.
 export async function getFailoverConfig() {
   const stored = await chrome.storage.local.get([
     ...ALL_FIELDS, "openrouterWorkingModels", CROSS_PROVIDER_FALLBACK_KEY
